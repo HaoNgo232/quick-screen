@@ -32,24 +32,53 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-async function ensureContentScript(tabId: number): Promise<boolean> {
+async function waitForTabReady(tabId: number, timeoutMs = 7000): Promise<chrome.tabs.Tab | null> {
   try {
-    const pong = await chrome.tabs.sendMessage(tabId, { type: 'PING' })
-    if (pong && pong.status === 'PONG') return true
+    const tab = await chrome.tabs.get(tabId)
+    if (!tab.discarded && tab.status === 'complete') {
+      return tab
+    }
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(async () => {
+        chrome.tabs.onUpdated.removeListener(listener)
+        const current = await chrome.tabs.get(tabId).catch(() => null)
+        resolve(current)
+      }, timeoutMs)
+
+      function listener(updatedTabId: number, changeInfo: { status?: string }, updatedTab: chrome.tabs.Tab) {
+        if (updatedTabId === tabId && changeInfo.status === 'complete') {
+          clearTimeout(timer)
+          chrome.tabs.onUpdated.removeListener(listener)
+          resolve(updatedTab)
+        }
+      }
+
+      chrome.tabs.onUpdated.addListener(listener)
+    })
   } catch {
+    return null
+  }
+}
+
+async function ensureContentScript(tabId: number, retries = 3): Promise<boolean> {
+  for (let i = 0; i < retries; i++) {
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['content_scripts/content-0.js']
-      })
-      await new Promise((r) => setTimeout(r, 150))
-      return true
-    } catch (err) {
-      console.warn('Could not inject content script:', err)
-      return false
+      const pong = await chrome.tabs.sendMessage(tabId, { type: 'PING' })
+      if (pong && pong.status === 'PONG') return true
+    } catch {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['content_scripts/content-0.js']
+        })
+        await new Promise((r) => setTimeout(r, 200))
+      } catch {
+        await new Promise((r) => setTimeout(r, 250))
+      }
     }
   }
-  return true
+  return false
 }
 
 let lastCaptureTime = 0
@@ -105,7 +134,7 @@ export class CaptureEngine {
   ): Promise<CaptureItem> {
     if (!tab.id) throw new Error('Tab has no valid ID')
 
-    await ensureContentScript(tab.id)
+    const hasScript = await ensureContentScript(tab.id)
 
     options?.onProgress?.({
       currentSlice: 0,
@@ -114,10 +143,71 @@ export class CaptureEngine {
       message: 'Đang chuẩn bị trang...'
     })
 
-    // 1. Measure page dimensions
-    const dims: PageDimensions = await chrome.tabs.sendMessage(tab.id, {
-      type: 'PREPARE_CAPTURE'
-    })
+    let dims: PageDimensions | null = null
+    if (hasScript) {
+      try {
+        dims = await chrome.tabs.sendMessage(tab.id, { type: 'PREPARE_CAPTURE' })
+      } catch {}
+    }
+
+    if (!dims) {
+      // Fallback to visible viewport capture for restricted or unscriptable pages
+      const dataUrl = await safeCaptureVisibleTab(tab.windowId)
+      const img = await loadImage(dataUrl)
+      const canvasWidth = img.width
+      const canvasHeight = img.height
+      const masterCanvas = document.createElement('canvas')
+      masterCanvas.width = canvasWidth
+      masterCanvas.height = canvasHeight
+      const ctx = masterCanvas.getContext('2d')
+      if (!ctx) throw new Error('Could not create 2D canvas context')
+      ctx.drawImage(img, 0, 0)
+
+      const thumbCanvas = document.createElement('canvas')
+      const thumbScale = Math.min(1, 200 / canvasWidth)
+      thumbCanvas.width = Math.round(canvasWidth * thumbScale)
+      thumbCanvas.height = Math.round(canvasHeight * thumbScale)
+      const thumbCtx = thumbCanvas.getContext('2d')
+      if (thumbCtx) {
+        thumbCtx.drawImage(masterCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height)
+      }
+      const thumbnailDataUrl = thumbCanvas.toDataURL('image/png')
+      const imageBlob = await new Promise<Blob>((resolve, reject) => {
+        masterCanvas.toBlob((blob) => {
+          if (blob) resolve(blob)
+          else reject(new Error('Canvas toBlob failed'))
+        }, 'image/png')
+      })
+
+      const pageTitle = tab.title || 'webpage'
+      const url = tab.url || ''
+      const filename = sanitizeFilename(pageTitle)
+      const shouldCopy = !options?.skipClipboard
+      const absolutePath = await this.sink.save(filename, dataUrl, shouldCopy)
+
+      if (shouldCopy) {
+        const ok = await copyDual(absolutePath, imageBlob)
+        if (!ok && this.sink.copyClipboard) {
+          await this.sink.copyClipboard(absolutePath)
+        }
+      }
+
+      const captureItem: CaptureItem = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        filename,
+        absolutePath,
+        pageTitle,
+        url,
+        timestamp: Date.now(),
+        thumbnailDataUrl,
+        width: canvasWidth,
+        height: canvasHeight
+      }
+
+      await this.history.add(captureItem)
+      await putImageBlob(captureItem.id, imageBlob)
+      return captureItem
+    }
 
     const { totalHeight, viewportHeight, viewportWidth, devicePixelRatio, pageTitle, url } = dims
 
@@ -327,10 +417,11 @@ export class CaptureEngine {
       )
 
       await chrome.tabs.update(targetTab.id, { active: true })
-      await new Promise((r) => setTimeout(r, 350))
+      const readyTab = await waitForTabReady(targetTab.id)
+      await new Promise((r) => setTimeout(r, 450))
 
       try {
-        const item = await this.captureTab(targetTab, {
+        const item = await this.captureTab(readyTab || targetTab, {
           skipClipboard: true,
           skipToast: true
         })
