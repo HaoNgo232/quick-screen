@@ -1,44 +1,271 @@
-import createContentApp from './ContentApp'
-import './styles.css'
+import type { PageDimensions } from '../types/capture'
 
-console.log('[From the page context] Hello from content_scripts!')
+let originalScrollX = 0
+let originalScrollY = 0
+let originalOverflow = ''
+let fixedElements: HTMLElement[] = []
+
+function findFixedElements(): HTMLElement[] {
+  const elements: HTMLElement[] = []
+  const allNodes = document.querySelectorAll<HTMLElement>('body *')
+
+  for (let i = 0; i < allNodes.length; i++) {
+    const el = allNodes[i]
+    if (!el || !(el instanceof HTMLElement)) continue
+    
+    // Ignore our own toast root if present
+    if (el.hasAttribute('data-quickscreen-toast')) continue
+
+    const style = window.getComputedStyle(el)
+    if (style.position === 'fixed' || style.position === 'sticky') {
+      elements.push(el)
+    }
+  }
+  return elements
+}
+
+function showToast(message: string, filePath?: string) {
+  const existingToast = document.getElementById('quickscreen-toast-container')
+  if (existingToast) {
+    existingToast.remove()
+  }
+
+  const toastContainer = document.createElement('div')
+  toastContainer.id = 'quickscreen-toast-container'
+  toastContainer.setAttribute('data-quickscreen-toast', 'true')
+  toastContainer.style.cssText = `
+    position: fixed !important;
+    bottom: 30px !important;
+    left: 50% !important;
+    transform: translateX(-50%) translateY(20px) !important;
+    background: rgba(24, 24, 27, 0.95) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(52, 211, 153, 0.4) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3), 0 0 20px rgba(52, 211, 153, 0.2) !important;
+    border-radius: 12px !important;
+    padding: 12px 20px !important;
+    z-index: 2147483647 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    max-width: 90vw !important;
+    cursor: pointer !important;
+    opacity: 0 !important;
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    pointer-events: auto !important;
+  `
+
+  const icon = document.createElement('div')
+  icon.style.cssText = `
+    width: 28px !important;
+    height: 28px !important;
+    background: #059669 !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: bold !important;
+  `
+  icon.innerHTML = '&#10003;'
+
+  const content = document.createElement('div')
+  content.style.cssText = `
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    overflow: hidden !important;
+  `
+
+  const title = document.createElement('div')
+  title.style.cssText = `
+    font-weight: 600 !important;
+    font-size: 13.5px !important;
+    color: #f4f4f5 !important;
+    white-space: nowrap !important;
+  `
+  title.textContent = message
+
+  content.appendChild(title)
+
+  if (filePath) {
+    const pathSnippet = document.createElement('div')
+    pathSnippet.style.cssText = `
+      font-size: 11.5px !important;
+      color: #a1a1aa !important;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      max-width: 450px !important;
+    `
+    pathSnippet.textContent = filePath
+    content.appendChild(pathSnippet)
+  }
+
+  toastContainer.appendChild(icon)
+  toastContainer.appendChild(content)
+  document.body.appendChild(toastContainer)
+
+  // Trigger smooth slide in
+  requestAnimationFrame(() => {
+    toastContainer.style.opacity = '1'
+    toastContainer.style.transform = 'translateX(-50%) translateY(0)'
+  })
+
+  if (filePath) {
+    toastContainer.title = 'Click để copy lại đường dẫn'
+    toastContainer.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(filePath)
+        title.textContent = '✓ Đã copy lại đường dẫn!'
+      } catch (err) {
+        console.error('Re-copy error:', err)
+      }
+    })
+  }
+
+  setTimeout(() => {
+    toastContainer.style.opacity = '0'
+    toastContainer.style.transform = 'translateX(-50%) translateY(10px)'
+    setTimeout(() => {
+      if (toastContainer.parentNode) {
+        toastContainer.remove()
+      }
+    }, 300)
+  }, 2500)
+}
 
 /**
- * Extension.js content_script entrypoint. The framework calls this on
- * injection and calls the returned function on HMR/teardown to clean up.
- * Do not invoke it yourself.
+ * Main message handler for extension capture requests
  */
-export default function initial() {
-  const rootDiv = document.createElement('div')
-  rootDiv.setAttribute('data-extension-root', 'true')
-  // Isolate the host from page styles (e.g. example.com ships div{opacity:.8},
-  // which would otherwise fade the whole widget): the shadow DOM only protects
-  // descendants; the host element itself still takes page CSS.
-  rootDiv.style.cssText = 'all: initial !important'
-  document.body.appendChild(rootDiv)
+function handleRuntimeMessage(
+  message: any,
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: any) => void
+) {
+  if (!message || !message.type) return false
 
-  // Injecting content_scripts inside a shadow dom
-  // prevents conflicts with the host page's styles.
-  // This way, styles from the extension won't leak into the host page.
-  const shadowRoot = rootDiv.attachShadow({mode: 'open'})
+  switch (message.type) {
+    case 'PING': {
+      sendResponse({ status: 'PONG' })
+      return false
+    }
 
-  const styleElement = document.createElement('style')
-  shadowRoot.appendChild(styleElement)
+    case 'PREPARE_CAPTURE': {
+      originalScrollX = window.scrollX
+      originalScrollY = window.scrollY
+      originalOverflow = document.documentElement.style.overflow
 
-  fetchCSS().then((response) => (styleElement.textContent = response))
+      document.documentElement.style.overflow = 'hidden'
+      fixedElements = findFixedElements()
 
-  // Render ContentApp inside shadow root
-  const container = createContentApp()
-  shadowRoot.appendChild(container)
+      const totalWidth = Math.max(
+        document.documentElement.scrollWidth,
+        document.body ? document.body.scrollWidth : 0,
+        window.innerWidth
+      )
 
-  return () => {
-    rootDiv.remove()
+      const totalHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body ? document.body.scrollHeight : 0,
+        window.innerHeight
+      )
+
+      const dimensions: PageDimensions = {
+        totalWidth,
+        totalHeight,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        pageTitle: document.title || 'Untitled',
+        url: window.location.href
+      }
+
+      sendResponse(dimensions)
+      return false
+    }
+
+    case 'SCROLL_TO': {
+      const { x, y, hideFixed } = message
+
+      if (hideFixed) {
+        for (const el of fixedElements) {
+          if (!el.hasAttribute('data-qs-orig-vis')) {
+            el.setAttribute('data-qs-orig-vis', el.style.visibility || 'visible')
+            el.style.visibility = 'hidden'
+          }
+        }
+      } else {
+        for (const el of fixedElements) {
+          if (el.hasAttribute('data-qs-orig-vis')) {
+            el.style.visibility = ''
+            el.removeAttribute('data-qs-orig-vis')
+          }
+        }
+      }
+
+      window.scrollTo({
+        left: x,
+        top: y,
+        behavior: 'instant' as ScrollBehavior
+      })
+
+      // Allow frame rendering
+      setTimeout(() => {
+        sendResponse({
+          scrolled: true,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY
+        })
+      }, 120)
+
+      return true // asynchronous response
+    }
+
+    case 'RESTORE_CAPTURE': {
+      for (const el of fixedElements) {
+        if (el.hasAttribute('data-qs-orig-vis')) {
+          el.style.visibility = ''
+          el.removeAttribute('data-qs-orig-vis')
+        }
+      }
+      fixedElements = []
+
+      window.scrollTo({
+        left: originalScrollX,
+        top: originalScrollY,
+        behavior: 'instant' as ScrollBehavior
+      })
+
+      document.documentElement.style.overflow = originalOverflow
+      sendResponse({ restored: true })
+      return false
+    }
+
+    case 'SHOW_TOAST': {
+      showToast(message.message, message.filePath)
+      sendResponse({ shown: true })
+      return false
+    }
+
+    default:
+      return false
   }
 }
 
-async function fetchCSS() {
-  const cssUrl = new URL('./styles.css', import.meta.url)
-  const response = await fetch(cssUrl)
-  const text = await response.text()
-  return response.ok ? text : Promise.reject(text)
+/**
+ * Extension.js entrypoint
+ */
+export default function initial() {
+  chrome.runtime.onMessage.addListener(handleRuntimeMessage)
+
+  return () => {
+    chrome.runtime.onMessage.removeListener(handleRuntimeMessage)
+  }
 }

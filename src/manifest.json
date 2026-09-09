@@ -3,17 +3,8 @@
   "chromium:manifest_version": 3,
   "firefox:manifest_version": 2,
   "version": "1.0.0",
-  "firefox:browser_specific_settings": {
-    "gecko": {
-      "data_collection_permissions": {
-        "required": [
-          "none"
-        ]
-      }
-    }
-  },
   "name": "quick-screen",
-  "description": "Adds a sidebar panel to the browser with a simple page.",
+  "description": "Capture full page screenshots, auto-save, and copy path for AI ingestion.",
   "icons": {
     "16": "images/icon.png",
     "32": "images/icon.png",
@@ -29,7 +20,7 @@
       "64": "images/icon.png",
       "128": "images/icon.png"
     },
-    "default_title": "Open Side Panel"
+    "default_title": "quick-screen Side Panel"
   },
   "firefox:browser_action": {
     "default_icon": {
@@ -39,18 +30,36 @@
       "64": "images/icon.png",
       "128": "images/icon.png"
     },
-    "default_title": "Open Side Panel"
+    "default_title": "quick-screen Side Panel"
   },
   "chromium:side_panel": {
     "default_path": "sidebar/index.html",
-    "default_title": "Side Panel Content"
+    "default_title": "quick-screen History & Capture"
   },
   "firefox:sidebar_action": {
     "default_panel": "sidebar/index.html",
-    "default_title": "Side Panel Content"
+    "default_title": "quick-screen History & Capture"
   },
   "chromium:permissions": [
-    "sidePanel"
+    "sidePanel",
+    "activeTab",
+    "tabs",
+    "downloads",
+    "clipboardWrite",
+    "storage",
+    "scripting",
+    "nativeMessaging"
+  ],
+  "firefox:permissions": [
+    "activeTab",
+    "tabs",
+    "downloads",
+    "clipboardWrite",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
     "chromium:service_worker": "background.ts",
