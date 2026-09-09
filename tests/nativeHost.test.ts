@@ -65,4 +65,35 @@ describe('Native Messaging Host Bridge', () => {
     // Cleanup test artifact
     fs.unlinkSync(`/tmp/quick-screen/${testFilename}`)
   })
+
+  it('handles copy_image action successfully', async () => {
+    const testFile = '/tmp/quick-screen/test-copy-img.png'
+    fs.mkdirSync('/tmp/quick-screen', { recursive: true })
+    fs.writeFileSync(testFile, Buffer.from('fake-png'))
+
+    const proc = spawn((process.env.HOME + '/.local/bin/quick-screen-host'), [], {
+      stdio: ['pipe', 'pipe', 'inherit']
+    })
+
+    const msg = JSON.stringify({ action: 'copy_image', filepath: testFile })
+    const msgBuffer = Buffer.from(msg, 'utf-8')
+    const lenBuffer = Buffer.alloc(4)
+    lenBuffer.writeUInt32LE(msgBuffer.length, 0)
+
+    proc.stdin.write(Buffer.concat([lenBuffer, msgBuffer]))
+
+    const response = await new Promise<any>((resolve) => {
+      proc.stdout.once('data', (data) => {
+        const length = data.readUInt32LE(0)
+        const payload = JSON.parse(data.subarray(4, 4 + length).toString('utf-8'))
+        resolve(payload)
+      })
+    })
+
+    proc.kill()
+    fs.unlinkSync(testFile)
+
+    expect(response.status).toBe('ok')
+    expect(response.filepath).toBe(testFile)
+  })
 })

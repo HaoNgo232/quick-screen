@@ -1,6 +1,6 @@
 import { captureEngine } from '../core/captureEngine'
 import { historyStore } from '../core/historyStore'
-import { copyText, copyDual } from '../core/clipboard'
+import { copyText } from '../core/clipboard'
 import type { CaptureItem } from '../types/capture'
 
 let isBusy = false
@@ -14,6 +14,7 @@ const ICONS = {
   image: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
   trash: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
   check: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  close: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
   emptyFrame: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`
 }
 
@@ -98,6 +99,39 @@ export default async function initSidebarApp() {
         </div>
       </div>
 
+      <!-- Hover Popover -->
+      <div id="qs-hover-popover" class="qs-hover-popover">
+        <img id="qs-hover-img" src="" alt="Preview" />
+      </div>
+
+      <!-- Lightbox Modal -->
+      <div id="qs-lightbox" class="qs-lightbox-backdrop">
+        <div class="qs-lightbox-header">
+          <div class="qs-lightbox-title-area">
+            <h2 id="lightbox-title" class="qs-lightbox-title">Screenshot</h2>
+            <span id="lightbox-meta" class="qs-lightbox-meta"></span>
+          </div>
+          <div class="qs-lightbox-actions">
+            <button id="lightbox-btn-path" class="qs-tool-btn qs-tool-btn-primary" type="button">
+              ${ICONS.copy}
+              <span>Path</span>
+            </button>
+            <button id="lightbox-btn-image" class="qs-tool-btn" type="button">
+              ${ICONS.image}
+              <span>Image</span>
+            </button>
+            <button id="lightbox-btn-close" class="qs-tool-btn qs-tool-btn-danger" type="button" title="Close (Esc)">
+              ${ICONS.close}
+            </button>
+          </div>
+        </div>
+        <div class="qs-lightbox-body" id="lightbox-body">
+          <div class="qs-lightbox-viewport">
+            <img id="lightbox-img" src="" alt="Full preview" />
+          </div>
+        </div>
+      </div>
+
       <!-- Toast Feedback -->
       <div id="qs-toast" class="qs-toast-overlay"></div>
     </div>
@@ -111,6 +145,69 @@ export default async function initSidebarApp() {
   const telemetryBar = document.getElementById('telemetry-bar-fill') as HTMLDivElement
   const feedContainer = document.getElementById('capture-feed') as HTMLDivElement
   const feedCount = document.getElementById('feed-count') as HTMLSpanElement
+
+  // Hover Popover elements
+  const hoverPopover = document.getElementById('qs-hover-popover') as HTMLDivElement
+  const hoverImg = document.getElementById('qs-hover-img') as HTMLImageElement
+
+  // Lightbox elements
+  const lightbox = document.getElementById('qs-lightbox') as HTMLDivElement
+  const lightboxTitle = document.getElementById('lightbox-title') as HTMLHeadingElement
+  const lightboxMeta = document.getElementById('lightbox-meta') as HTMLSpanElement
+  const lightboxImg = document.getElementById('lightbox-img') as HTMLImageElement
+  const lightboxBtnClose = document.getElementById('lightbox-btn-close') as HTMLButtonElement
+  const lightboxBtnPath = document.getElementById('lightbox-btn-path') as HTMLButtonElement
+  const lightboxBtnImage = document.getElementById('lightbox-btn-image') as HTMLButtonElement
+
+  let activeLightboxItem: CaptureItem | null = null
+
+  function openLightbox(item: CaptureItem) {
+    activeLightboxItem = item
+    lightboxTitle.textContent = item.pageTitle
+    lightboxTitle.title = item.pageTitle
+    lightboxMeta.textContent = `${item.width}×${item.height}px`
+    lightboxImg.src = item.thumbnailDataUrl
+    lightbox.classList.add('open')
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove('open')
+    activeLightboxItem = null
+  }
+
+  lightboxBtnClose.addEventListener('click', closeLightbox)
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox || e.target === document.getElementById('lightbox-body')) {
+      closeLightbox()
+    }
+  })
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox.classList.contains('open')) {
+      closeLightbox()
+    }
+  })
+
+  lightboxBtnPath.addEventListener('click', async () => {
+    if (activeLightboxItem) {
+      await copyText(activeLightboxItem.absolutePath)
+      notify('Path copied to clipboard')
+    }
+  })
+
+  lightboxBtnImage.addEventListener('click', async () => {
+    if (activeLightboxItem) {
+      const ok = await captureEngine.copyImageArtifact(
+        activeLightboxItem.absolutePath,
+        activeLightboxItem.thumbnailDataUrl
+      )
+      if (ok) {
+        notify('Raw image copied to clipboard')
+      } else {
+        notify('Failed to copy image')
+      }
+    }
+  })
 
   async function renderFeed() {
     const items = await historyStore.list()
@@ -131,7 +228,7 @@ export default async function initSidebarApp() {
       .map(
         (item: CaptureItem) => `
         <article class="qs-item" data-id="${item.id}">
-          <div class="qs-item-thumb">
+          <div class="qs-item-thumb" data-id="${item.id}" title="Click to view full preview">
             <img src="${item.thumbnailDataUrl}" alt="${item.pageTitle}" loading="lazy" />
           </div>
           <div class="qs-item-body">
@@ -144,7 +241,7 @@ export default async function initSidebarApp() {
                 ${ICONS.copy}
                 <span>Path</span>
               </button>
-              <button class="qs-tool-btn qs-action-copy-image" data-id="${item.id}" title="Copy image data">
+              <button class="qs-tool-btn qs-action-copy-image" data-id="${item.id}" title="Copy raw image to clipboard">
                 ${ICONS.image}
                 <span>Image</span>
               </button>
@@ -158,7 +255,7 @@ export default async function initSidebarApp() {
       )
       .join('')
 
-    // Bind action listeners
+    // Bind card action buttons
     feedContainer.querySelectorAll<HTMLButtonElement>('.qs-action-copy-path').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const path = btn.getAttribute('data-path')
@@ -174,14 +271,11 @@ export default async function initSidebarApp() {
         const id = btn.getAttribute('data-id')
         const item = items.find((i) => i.id === id)
         if (item) {
-          try {
-            const res = await fetch(item.thumbnailDataUrl)
-            const blob = await res.blob()
-            await copyDual(item.absolutePath, blob)
-            notify('Image & path copied')
-          } catch {
-            await copyText(item.absolutePath)
-            notify('Path copied')
+          const ok = await captureEngine.copyImageArtifact(item.absolutePath, item.thumbnailDataUrl)
+          if (ok) {
+            notify('Raw image copied to clipboard')
+          } else {
+            notify('Failed to copy image')
           }
         }
       })
@@ -195,6 +289,33 @@ export default async function initSidebarApp() {
           await renderFeed()
           notify('Removed from history')
         }
+      })
+    })
+
+    // Bind hover and click preview on thumbnails
+    feedContainer.querySelectorAll<HTMLDivElement>('.qs-item-thumb').forEach((thumb) => {
+      const id = thumb.getAttribute('data-id')
+      const item = items.find((i) => i.id === id)
+      if (!item) return
+
+      // Hover preview popover
+      thumb.addEventListener('mouseenter', () => {
+        const rect = thumb.getBoundingClientRect()
+        hoverImg.src = item.thumbnailDataUrl
+        const topPos = Math.max(10, Math.min(window.innerHeight - 370, rect.top - 20))
+        hoverPopover.style.top = `${topPos}px`
+        hoverPopover.style.left = '16px'
+        hoverPopover.classList.add('visible')
+      })
+
+      thumb.addEventListener('mouseleave', () => {
+        hoverPopover.classList.remove('visible')
+      })
+
+      // Click to open Lightbox Modal
+      thumb.addEventListener('click', () => {
+        hoverPopover.classList.remove('visible')
+        openLightbox(item)
       })
     })
   }

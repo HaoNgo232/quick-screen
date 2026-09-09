@@ -25,3 +25,16 @@ export async function copyText(text: string): Promise<boolean> {
     return false
   }
 }
+
+export async function copyImageOnly(imageBlob: Blob): Promise<boolean> {
+  try {
+    const item = new ClipboardItem({
+      'image/png': imageBlob
+    })
+    await navigator.clipboard.write([item])
+    return true
+  } catch (err) {
+    console.error('Copy image only failed:', err)
+    return false
+  }
+}

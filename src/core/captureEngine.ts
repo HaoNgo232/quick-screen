@@ -1,7 +1,7 @@
 import type { PageDimensions, CaptureItem, CaptureProgress } from '../types/capture'
 import { AutoSink, type ArtifactSink } from './sink'
 import { historyStore, HistoryStore } from './historyStore'
-import { copyDual, copyText } from './clipboard'
+import { copyDual, copyText, copyImageOnly } from './clipboard'
 
 const MAX_CANVAS_HEIGHT = 16000
 
@@ -190,7 +190,7 @@ export class CaptureEngine {
     if (thumbCtx) {
       thumbCtx.drawImage(masterCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height)
     }
-    const thumbnailDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.8)
+    const thumbnailDataUrl = thumbCanvas.toDataURL('image/png')
 
     // 7. Extract PNG blob & data URL
     const fullDataUrl = masterCanvas.toDataURL('image/png')
@@ -333,6 +333,29 @@ export class CaptureEngine {
     }
 
     return { items: capturedItems, combinedPaths }
+  }
+
+  /**
+   * Copies raw image binary of a captured artifact to clipboard.
+   * Prioritizes native host for 100% full-resolution PNG fidelity on Linux.
+   */
+  async copyImageArtifact(filepath: string, fallbackDataUrl?: string): Promise<boolean> {
+    if (this.sink.copyImage) {
+      const ok = await this.sink.copyImage(filepath)
+      if (ok) return true
+    }
+
+    if (fallbackDataUrl) {
+      try {
+        const res = await fetch(fallbackDataUrl)
+        const blob = await res.blob()
+        const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' })
+        return await copyImageOnly(pngBlob)
+      } catch {
+        return false
+      }
+    }
+    return false
   }
 }
 

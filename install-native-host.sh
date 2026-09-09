@@ -56,6 +56,25 @@ def main():
                 text = msg.get('text', '')
                 copy_to_clipboard(text)
                 send_message({'status': 'ok'})
+            elif action == 'copy_image':
+                filepath = msg.get('filepath', '')
+                if not filepath or not os.path.exists(filepath):
+                    filename = msg.get('filename', '')
+                    filepath = os.path.join(TARGET_DIR, filename)
+                
+                if os.path.exists(filepath):
+                    try:
+                        subprocess.run(['xclip', '-selection', 'clipboard', '-t', 'image/png', '-i', filepath], check=False)
+                        send_message({'status': 'ok', 'filepath': filepath})
+                    except Exception:
+                        try:
+                            with open(filepath, 'rb') as img_f:
+                                subprocess.run(['wl-copy', '-t', 'image/png'], input=img_f.read(), check=False)
+                            send_message({'status': 'ok', 'filepath': filepath})
+                        except Exception as wle:
+                            send_message({'status': 'error', 'error': str(wle)})
+                else:
+                    send_message({'status': 'error', 'error': 'File not found'})
             elif action == 'save':
                 filename = msg.get('filename', 'screenshot.png')
                 base64_data = msg.get('base64Data', '')

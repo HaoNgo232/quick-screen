@@ -6,6 +6,7 @@ export interface ArtifactSink {
   save(filename: string, dataUrl: string, copyClipboard?: boolean): Promise<string>
   saveBatch?(items: { filename: string; dataUrl: string }[]): Promise<string[]>
   copyClipboard?(text: string): Promise<boolean>
+  copyImage?(filepath: string): Promise<boolean>
 }
 
 /**
@@ -39,6 +40,22 @@ export class NativeHostSink implements ArtifactSink {
         chrome.runtime.sendNativeMessage(
           'com.quickscreen.host',
           { action: 'copy_text', text },
+          (response) => {
+            resolve(response?.status === 'ok')
+          }
+        )
+      } catch {
+        resolve(false)
+      }
+    })
+  }
+
+  async copyImage(filepath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendNativeMessage(
+          'com.quickscreen.host',
+          { action: 'copy_image', filepath },
           (response) => {
             resolve(response?.status === 'ok')
           }
@@ -137,6 +154,14 @@ export class AutoSink implements ArtifactSink {
   async copyClipboard(text: string): Promise<boolean> {
     if (this.nativeSink.copyClipboard) {
       const ok = await this.nativeSink.copyClipboard(text)
+      if (ok) return true
+    }
+    return false
+  }
+
+  async copyImage(filepath: string): Promise<boolean> {
+    if (this.nativeSink.copyImage) {
+      const ok = await this.nativeSink.copyImage(filepath)
       if (ok) return true
     }
     return false
