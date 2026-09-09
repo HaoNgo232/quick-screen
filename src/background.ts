@@ -32,10 +32,10 @@ chrome.runtime.onMessage.addListener((message) => {
     if (!chrome.sidePanel?.open) return
 
     try {
-      if (activeTabId) {
-        chrome.sidePanel.open({ tabId: activeTabId })
-      } else if (windowId) {
+      if (windowId) {
         chrome.sidePanel.open({ windowId })
+      } else if (activeTabId) {
+        chrome.sidePanel.open({ tabId: activeTabId })
       }
     } catch (error) {
       console.error(error)

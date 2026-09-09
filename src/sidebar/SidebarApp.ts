@@ -265,6 +265,24 @@ export default async function initSidebarApp() {
   // Batch Tabs Capture
   btnCaptureBatch.addEventListener('click', async () => {
     if (isBusy) return
+
+    // If running in popup mode, tab switching will immediately destroy the popup!
+    // Seamlessly hand off to the persistent Side Panel to perform batch capture across tabs.
+    const isPopup = window.location.pathname.includes('action') || window.location.pathname.includes('popup')
+    if (isPopup) {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (tab?.windowId && chrome.sidePanel?.open) {
+          await chrome.storage.local.set({ qs_trigger_batch: true })
+          await chrome.sidePanel.open({ windowId: tab.windowId })
+          window.close()
+          return
+        }
+      } catch (err) {
+        console.warn('Could not switch to side panel for batch capture:', err)
+      }
+    }
+
     isBusy = true
     btnCaptureActive.disabled = true
     btnCaptureBatch.disabled = true
@@ -306,6 +324,18 @@ export default async function initSidebarApp() {
 
   // Initial render
   await renderFeed()
+
+  // Auto-trigger batch capture if handed off from popup
+  const isSidebar = window.location.pathname.includes('sidebar')
+  if (isSidebar) {
+    const triggerData = await chrome.storage.local.get('qs_trigger_batch')
+    if (triggerData.qs_trigger_batch) {
+      await chrome.storage.local.remove('qs_trigger_batch')
+      setTimeout(() => {
+        btnCaptureBatch.click()
+      }, 350)
+    }
+  }
 }
 
 initSidebarApp()

@@ -416,11 +416,11 @@ export class CaptureEngine {
         validTabs.length
       )
 
-      await chrome.tabs.update(targetTab.id, { active: true })
-      const readyTab = await waitForTabReady(targetTab.id)
-      await new Promise((r) => setTimeout(r, 450))
-
       try {
+        await chrome.tabs.update(targetTab.id, { active: true })
+        const readyTab = await waitForTabReady(targetTab.id)
+        await new Promise((r) => setTimeout(r, 450))
+
         const item = await this.captureTab(readyTab || targetTab, {
           skipClipboard: true,
           skipToast: true
