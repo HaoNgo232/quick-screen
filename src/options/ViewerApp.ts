@@ -1,12 +1,15 @@
 import { historyStore } from '../core/historyStore'
 import { captureEngine } from '../core/captureEngine'
+import { getImageBlob } from '../core/imageStore'
 import type { CaptureItem } from '../types/capture'
 
 const ICONS = {
   viewfinder: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M4 16v3a1 1 0 0 0 1 1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M16 20h3a1 1 0 0 0 1-1v-3"/><circle cx="12" cy="12" r="3"/><line x1="8" y1="12" x2="6" y2="12"/></svg>`,
   copy: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
   close: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-  check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+  check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  zoom: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`,
+  external: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`
 }
 
 function formatTimestamp(timestamp: number): string {
@@ -76,6 +79,14 @@ export async function initViewerApp() {
         </div>
       </div>
       <div class="qs-viewer-actions">
+        <button id="viewer-btn-zoom" class="qs-btn" title="Toggle between Fit Width and 100% Actual Size">
+          ${ICONS.zoom}
+          <span id="viewer-zoom-label">Actual Size (100%)</span>
+        </button>
+        <button id="viewer-btn-open-os" class="qs-btn" title="Open with OS image viewer (Xviewer/Pix)">
+          ${ICONS.external}
+          <span>Open in App</span>
+        </button>
         <button id="viewer-btn-copy-path" class="qs-btn qs-btn-primary" title="Copy file path to clipboard">
           ${ICONS.copy}
           <span>Copy Path</span>
@@ -98,11 +109,36 @@ export async function initViewerApp() {
     </main>
   `
 
+  const btnZoom = document.getElementById('viewer-btn-zoom') as HTMLButtonElement
+  const zoomLabel = document.getElementById('viewer-zoom-label') as HTMLSpanElement
+  const btnOpenOs = document.getElementById('viewer-btn-open-os') as HTMLButtonElement
   const btnCopyPath = document.getElementById('viewer-btn-copy-path') as HTMLButtonElement
   const btnClose = document.getElementById('viewer-btn-close') as HTMLButtonElement
   const loadingEl = document.getElementById('viewer-loading') as HTMLDivElement
   const imgWrap = document.getElementById('viewer-img-wrap') as HTMLDivElement
   const imgEl = document.getElementById('viewer-img') as HTMLImageElement
+
+  let isActualSize = false
+
+  btnZoom.addEventListener('click', () => {
+    isActualSize = !isActualSize
+    if (isActualSize) {
+      imgWrap.classList.add('actual-size')
+      zoomLabel.textContent = 'Fit Width'
+    } else {
+      imgWrap.classList.remove('actual-size')
+      zoomLabel.textContent = 'Actual Size (100%)'
+    }
+  })
+
+  btnOpenOs.addEventListener('click', async () => {
+    const ok = await captureEngine.openArtifact(item.absolutePath)
+    if (ok) {
+      showToast('Opened in system image viewer')
+    } else {
+      showToast('Could not open file in system')
+    }
+  })
 
   btnCopyPath.addEventListener('click', async () => {
     await captureEngine.copyTextArtifact(item.absolutePath)
@@ -119,20 +155,32 @@ export async function initViewerApp() {
     }
   })
 
-  // Load high-resolution image via native host
-  let fullDataUrl: string | null = null
+  // 1. Try to load from IndexedDB cache
+  let imageBlob: Blob | null = null
   try {
-    fullDataUrl = await captureEngine.readArtifactImage(item.absolutePath)
-  } catch (err) {
-    console.warn('Failed to read image from native host:', err)
+    imageBlob = await getImageBlob(item.id)
+  } catch {}
+
+  // 2. Fallback to native host chunked reader
+  if (!imageBlob && item.absolutePath) {
+    try {
+      imageBlob = await captureEngine.readArtifactBlob(item.absolutePath)
+    } catch (err) {
+      console.warn('Native host chunk reader failed:', err)
+    }
   }
 
-  const finalSrc = fullDataUrl || item.thumbnailDataUrl
-  imgEl.src = finalSrc
+  // 3. Fallback to thumbnail dataUrl as last resort
+  if (imageBlob) {
+    const objectUrl = URL.createObjectURL(imageBlob)
+    imgEl.src = objectUrl
+  } else {
+    imgEl.src = item.thumbnailDataUrl
+  }
 
   imgEl.onload = () => {
     loadingEl.style.display = 'none'
-    imgWrap.style.display = 'inline-block'
+    imgWrap.style.display = 'block'
   }
 
   imgEl.onerror = () => {

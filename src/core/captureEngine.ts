@@ -2,6 +2,7 @@ import type { PageDimensions, CaptureItem, CaptureProgress } from '../types/capt
 import { AutoSink, type ArtifactSink } from './sink'
 import { historyStore, HistoryStore } from './historyStore'
 import { copyDual, copyText, copyImageOnly } from './clipboard'
+import { putImageBlob, getImageBlob } from './imageStore'
 
 const MAX_CANVAS_HEIGHT = 16000
 
@@ -237,8 +238,9 @@ export class CaptureEngine {
       height: canvasHeight
     }
 
-    // 11. Record into history
+    // 11. Record into history and cache full resolution blob in IndexedDB
     await this.history.add(captureItem)
+    await putImageBlob(captureItem.id, imageBlob)
 
     options?.onProgress?.({
       currentSlice: totalSlices,
@@ -391,6 +393,35 @@ export class CaptureEngine {
       return await this.sink.readFile(filepath)
     }
     return null
+  }
+
+  /**
+   * Reads the full-resolution captured PNG image as a Blob via native host chunking.
+   * Safely handles arbitrarily large images (e.g. 25MB) avoiding the 1MB Native Messaging limit.
+   */
+  async readArtifactBlob(filepath: string): Promise<Blob | null> {
+    if (!this.sink.readFileChunk) return null
+
+    let offset = 0
+    const chunks: BlobPart[] = []
+    const chunkSize = 512 * 1024
+
+    while (true) {
+      const res = await this.sink.readFileChunk(filepath, offset, chunkSize)
+      if (!res) return null
+
+      const binary = atob(res.data)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      chunks.push(bytes)
+
+      if (res.eof) break
+      offset += bytes.length
+    }
+
+    return new Blob(chunks, { type: 'image/png' })
   }
 }
 

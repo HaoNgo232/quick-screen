@@ -8,6 +8,7 @@ export interface ArtifactSink {
   copyClipboard?(text: string): Promise<boolean>
   copyImage?(filepath: string): Promise<boolean>
   readFile?(filepath: string): Promise<string | null>
+  readFileChunk?(filepath: string, offset: number, chunkSize?: number): Promise<{ data: string; eof: boolean; totalSize: number } | null>
   openFile?(filepath: string): Promise<boolean>
 }
 
@@ -77,6 +78,26 @@ export class NativeHostSink implements ArtifactSink {
           (response) => {
             if (!chrome.runtime.lastError && response?.status === 'ok' && response.dataUrl) {
               resolve(response.dataUrl)
+            } else {
+              resolve(null)
+            }
+          }
+        )
+      } catch {
+        resolve(null)
+      }
+    })
+  }
+
+  async readFileChunk(filepath: string, offset: number, chunkSize = 512 * 1024): Promise<{ data: string; eof: boolean; totalSize: number } | null> {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendNativeMessage(
+          'com.quickscreen.host',
+          { action: 'read_file_chunk', filepath, offset, chunkSize },
+          (response) => {
+            if (!chrome.runtime.lastError && response?.status === 'ok' && response.data) {
+              resolve(response)
             } else {
               resolve(null)
             }
@@ -208,6 +229,13 @@ export class AutoSink implements ArtifactSink {
   async readFile(filepath: string): Promise<string | null> {
     if (this.nativeSink.readFile) {
       return await this.nativeSink.readFile(filepath)
+    }
+    return null
+  }
+
+  async readFileChunk(filepath: string, offset: number, chunkSize?: number): Promise<{ data: string; eof: boolean; totalSize: number } | null> {
+    if (this.nativeSink.readFileChunk) {
+      return await this.nativeSink.readFileChunk(filepath, offset, chunkSize)
     }
     return null
   }

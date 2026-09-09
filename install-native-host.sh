@@ -142,6 +142,29 @@ def main():
                     send_message({'status': 'ok', 'dataUrl': f'data:image/png;base64,{b64}'})
                 else:
                     send_message({'status': 'error', 'error': 'File not found'})
+            elif action == 'read_file_chunk':
+                filepath = msg.get('filepath', '')
+                if not filepath or not os.path.exists(filepath):
+                    filename = msg.get('filename', '')
+                    filepath = os.path.join(TARGET_DIR, filename)
+                
+                if os.path.exists(filepath):
+                    offset = msg.get('offset', 0)
+                    chunk_size = msg.get('chunkSize', 512 * 1024)
+                    total_size = os.path.getsize(filepath)
+                    with open(filepath, 'rb') as f:
+                        f.seek(offset)
+                        chunk = f.read(chunk_size)
+                        b64_chunk = base64.b64encode(chunk).decode('utf-8')
+                    send_message({
+                        'status': 'ok',
+                        'totalSize': total_size,
+                        'offset': offset,
+                        'data': b64_chunk,
+                        'eof': (offset + len(chunk)) >= total_size
+                    })
+                else:
+                    send_message({'status': 'error', 'error': 'File not found'})
             else:
                 send_message({'status': 'error', 'error': f'Unknown action: {action}'})
         except Exception as e:
