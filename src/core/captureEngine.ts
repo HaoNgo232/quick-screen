@@ -52,6 +52,33 @@ async function ensureContentScript(tabId: number): Promise<boolean> {
   return true
 }
 
+let lastCaptureTime = 0
+
+async function safeCaptureVisibleTab(windowId?: number, retries = 5): Promise<string> {
+  const minInterval = 550 // Minimum 550ms interval between calls to safely conform to MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND (2/sec)
+  const elapsed = Date.now() - lastCaptureTime
+  if (elapsed < minInterval) {
+    await new Promise((r) => setTimeout(r, minInterval - elapsed))
+  }
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      lastCaptureTime = Date.now()
+      const targetWindowId = windowId || chrome.windows.WINDOW_ID_CURRENT
+      return await chrome.tabs.captureVisibleTab(targetWindowId, { format: 'png' })
+    } catch (err: any) {
+      const msg = String(err?.message || '')
+      if ((msg.includes('MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND') || msg.includes('quota')) && attempt < retries - 1) {
+        // Backoff wait if Chromium's token bucket is exhausted
+        await new Promise((r) => setTimeout(r, 700 + attempt * 400))
+        continue
+      }
+      throw err
+    }
+  }
+  throw new Error('Đã vượt quá giới hạn chụp của trình duyệt (quota exceeded), vui lòng thử lại sau giây lát')
+}
+
 export interface CaptureTabOptions {
   onProgress?: (p: CaptureProgress) => void
   skipClipboard?: boolean
@@ -144,7 +171,7 @@ export class CaptureEngine {
         hideFixed: i > 0
       })
 
-      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' })
+      const dataUrl = await safeCaptureVisibleTab(tab.windowId)
       const img = await loadImage(dataUrl)
 
       options?.onProgress?.({
