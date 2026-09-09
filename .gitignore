@@ -37,8 +37,10 @@ extension-env.d.ts
 
 
 
-# Extension.js local session state
-
 .env
 .env*
 !.env.example
+
+# python
+__pycache__/
+*.pyc

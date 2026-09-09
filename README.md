@@ -14,11 +14,19 @@
 
 ## Cài đặt & Sử dụng
 
-### 1. Kích hoạt Native Host (để lưu tự động vào /tmp không hiện popup)
+### 1. Kích hoạt Native Host (để lưu tự động không hiện popup)
 Chạy script cài đặt 1 lần duy nhất trên máy:
-```bash
-./install-native-host.sh
-```
+
+- **Linux**:
+  ```bash
+  ./install-native-host.sh
+  ```
+- **Windows**:
+  Chạy file script bằng Command Prompt hoặc PowerShell:
+  ```cmd
+  install-native-host.bat
+  ```
+  *(hoặc trong PowerShell: `powershell -ExecutionPolicy Bypass -File .\install-native-host.ps1`)*
 
 ### 2. Build extension
 ```bash
