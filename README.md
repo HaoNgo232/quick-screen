@@ -42,8 +42,10 @@ npm run build
 - Bấm **"⚡ Chụp trang này (Full Page)"** hoặc **"📑 Chụp tất cả các tab (Batch)"**.
 - Ảnh tự động lưu vào `/tmp/quick-screen/...` và đường dẫn đã có sẵn trong clipboard, dán ngay vào AI!
 
-## Tài liệu kiến trúc
+## Tài liệu kiến trúc & Vận hành
 - [Thuật ngữ miền (CONTEXT.md)](./CONTEXT.md)
+- [Hướng dẫn Native Host trên Windows](./docs/native-host-windows.md)
 - [ADR 0001: Scroll & Stitch Capture](./docs/adr/0001-scroll-and-stitch-capture.md)
 - [ADR 0002: Download API for Local Artifacts](./docs/adr/0002-download-api-for-local-artifacts.md)
 - [ADR 0003: Native Messaging Host for /tmp](./docs/adr/0003-native-messaging-for-tmp-storage.md)
+- [ADR 0004: Windows Support for Native Messaging Host](./docs/adr/0004-windows-native-messaging-host.md)
