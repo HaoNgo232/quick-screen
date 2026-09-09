@@ -3,8 +3,9 @@
  * Two real adapters exist: NativeHostSink (/tmp via stdio) and DownloadApiSink (Downloads API).
  */
 export interface ArtifactSink {
-  save(filename: string, dataUrl: string): Promise<string>
+  save(filename: string, dataUrl: string, copyClipboard?: boolean): Promise<string>
   saveBatch?(items: { filename: string; dataUrl: string }[]): Promise<string[]>
+  copyClipboard?(text: string): Promise<boolean>
 }
 
 /**
@@ -12,12 +13,12 @@ export interface ArtifactSink {
  * Saves directly to /tmp/quick-screen/ with zero prompts via native messaging host.
  */
 export class NativeHostSink implements ArtifactSink {
-  async save(filename: string, dataUrl: string): Promise<string> {
+  async save(filename: string, dataUrl: string, copyClipboard = true): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
         chrome.runtime.sendNativeMessage(
           'com.quickscreen.host',
-          { action: 'save', filename, base64Data: dataUrl },
+          { action: 'save', filename, base64Data: dataUrl, copyClipboard },
           (response) => {
             if (chrome.runtime.lastError || !response || response.status !== 'ok') {
               reject(new Error(chrome.runtime.lastError?.message || response?.error || 'Native host failed'))
@@ -28,6 +29,22 @@ export class NativeHostSink implements ArtifactSink {
         )
       } catch (err) {
         reject(err)
+      }
+    })
+  }
+
+  async copyClipboard(text: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendNativeMessage(
+          'com.quickscreen.host',
+          { action: 'copy_text', text },
+          (response) => {
+            resolve(response?.status === 'ok')
+          }
+        )
+      } catch {
+        resolve(false)
       }
     })
   }
@@ -109,12 +126,20 @@ export class AutoSink implements ArtifactSink {
     private downloadSink: ArtifactSink = new DownloadApiSink()
   ) {}
 
-  async save(filename: string, dataUrl: string): Promise<string> {
+  async save(filename: string, dataUrl: string, copyClipboard = true): Promise<string> {
     try {
-      return await this.nativeSink.save(filename, dataUrl)
+      return await this.nativeSink.save(filename, dataUrl, copyClipboard)
     } catch {
-      return await this.downloadSink.save(filename, dataUrl)
+      return await this.downloadSink.save(filename, dataUrl, copyClipboard)
     }
+  }
+
+  async copyClipboard(text: string): Promise<boolean> {
+    if (this.nativeSink.copyClipboard) {
+      const ok = await this.nativeSink.copyClipboard(text)
+      if (ok) return true
+    }
+    return false
   }
 
   async saveBatch(items: { filename: string; dataUrl: string }[]): Promise<string[]> {

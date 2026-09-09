@@ -52,9 +52,14 @@ def main():
             action = msg.get('action')
             if action == 'ping':
                 send_message({'status': 'ok', 'pong': True})
+            elif action == 'copy_text':
+                text = msg.get('text', '')
+                copy_to_clipboard(text)
+                send_message({'status': 'ok'})
             elif action == 'save':
                 filename = msg.get('filename', 'screenshot.png')
                 base64_data = msg.get('base64Data', '')
+                should_copy = msg.get('copyClipboard', True)
                 if ',' in base64_data:
                     base64_data = base64_data.split(',', 1)[1]
                 
@@ -63,7 +68,8 @@ def main():
                 with open(filepath, 'wb') as f:
                     f.write(raw_bytes)
                 
-                copy_to_clipboard(filepath)
+                if should_copy:
+                    copy_to_clipboard(filepath)
                 
                 send_message({
                     'status': 'ok',

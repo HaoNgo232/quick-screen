@@ -51,6 +51,12 @@ async function ensureContentScript(tabId: number): Promise<boolean> {
   return true
 }
 
+export interface CaptureTabOptions {
+  onProgress?: (p: CaptureProgress) => void
+  skipClipboard?: boolean
+  skipToast?: boolean
+}
+
 /**
  * Module: CaptureEngine
  * Deep module encapsulating browser scrolling, canvas stitching, adaptive scaling,
@@ -67,13 +73,13 @@ export class CaptureEngine {
    */
   async captureTab(
     tab: chrome.tabs.Tab,
-    onProgress?: (p: CaptureProgress) => void
+    options?: CaptureTabOptions
   ): Promise<CaptureItem> {
     if (!tab.id) throw new Error('Tab has no valid ID')
 
     await ensureContentScript(tab.id)
 
-    onProgress?.({
+    options?.onProgress?.({
       currentSlice: 0,
       totalSlices: 1,
       status: 'preparing',
@@ -123,7 +129,7 @@ export class CaptureEngine {
     // 4. Scroll, capture and stitch
     for (let i = 0; i < totalSlices; i++) {
       const slice = slices[i]
-      onProgress?.({
+      options?.onProgress?.({
         currentSlice: i + 1,
         totalSlices,
         status: 'scrolling',
@@ -140,7 +146,7 @@ export class CaptureEngine {
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' })
       const img = await loadImage(dataUrl)
 
-      onProgress?.({
+      options?.onProgress?.({
         currentSlice: i + 1,
         totalSlices,
         status: 'stitching',
@@ -168,7 +174,7 @@ export class CaptureEngine {
     // 5. Restore page DOM state
     await chrome.tabs.sendMessage(tab.id, { type: 'RESTORE_CAPTURE' })
 
-    onProgress?.({
+    options?.onProgress?.({
       currentSlice: totalSlices,
       totalSlices,
       status: 'saving',
@@ -197,19 +203,24 @@ export class CaptureEngine {
 
     // 8. Persist through ArtifactSink seam
     const filename = sanitizeFilename(pageTitle)
-    const absolutePath = await this.sink.save(filename, fullDataUrl)
+    const shouldCopy = !options?.skipClipboard
+    const absolutePath = await this.sink.save(filename, fullDataUrl, shouldCopy)
 
-    // 9. Write dual clipboard
-    await copyDual(absolutePath, imageBlob)
+    // 9. Write dual clipboard (only if not in batch mode)
+    if (shouldCopy) {
+      await copyDual(absolutePath, imageBlob)
+    }
 
-    // 10. Trigger in-page toast feedback
-    try {
-      await chrome.tabs.sendMessage(tab.id, {
-        type: 'SHOW_TOAST',
-        message: 'Đã chụp & copy path vào clipboard!',
-        filePath: absolutePath
-      })
-    } catch {}
+    // 10. Trigger in-page toast feedback (only if not in batch mode)
+    if (!options?.skipToast) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'SHOW_TOAST',
+          message: 'Đã chụp & copy path vào clipboard!',
+          filePath: absolutePath
+        })
+      } catch {}
+    }
 
     const captureItem: CaptureItem = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -226,7 +237,7 @@ export class CaptureEngine {
     // 11. Record into history
     await this.history.add(captureItem)
 
-    onProgress?.({
+    options?.onProgress?.({
       currentSlice: totalSlices,
       totalSlices,
       status: 'done',
@@ -245,7 +256,7 @@ export class CaptureEngine {
     if (!activeTab || !activeTab.id) {
       throw new Error('Không tìm thấy tab đang kích hoạt')
     }
-    return this.captureTab(activeTab, onProgress)
+    return this.captureTab(activeTab, { onProgress })
   }
 
   /**
@@ -287,7 +298,10 @@ export class CaptureEngine {
       await new Promise((r) => setTimeout(r, 350))
 
       try {
-        const item = await this.captureTab(targetTab)
+        const item = await this.captureTab(targetTab, {
+          skipClipboard: true,
+          skipToast: true
+        })
         capturedItems.push(item)
       } catch (err) {
         console.error(`Lỗi khi chụp tab ${targetTab.id}:`, err)
@@ -296,9 +310,16 @@ export class CaptureEngine {
 
     if (initialActiveTabId) {
       await chrome.tabs.update(initialActiveTabId, { active: true })
+      await new Promise((r) => setTimeout(r, 200))
     }
 
     const combinedPaths = capturedItems.map((i) => i.absolutePath).join('\n')
+
+    // 1. Copy via native host (X11 / Wayland OS level)
+    if (this.sink.copyClipboard) {
+      await this.sink.copyClipboard(combinedPaths)
+    }
+    // 2. Also copy via browser clipboard
     await copyText(combinedPaths)
 
     if (initialActiveTabId) {
