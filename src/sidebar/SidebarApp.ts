@@ -14,6 +14,7 @@ const ICONS = {
   trash: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
   check: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   close: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  sidebar: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg>`,
   emptyFrame: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`
 }
 
@@ -48,9 +49,14 @@ export default async function initSidebarApp() {
             <span class="qs-brand-tagline">AI Screen Capture Bridge</span>
           </div>
         </div>
-        <div class="qs-status-pill">
-          <span class="qs-status-dot"></span>
-          <span>READY</span>
+        <div class="qs-header-controls">
+          <button id="btn-dock-sidebar" class="qs-btn-icon" title="Dock to Side Panel" type="button">
+            ${ICONS.sidebar}
+          </button>
+          <div class="qs-status-pill">
+            <span class="qs-status-dot"></span>
+            <span>READY</span>
+          </div>
         </div>
       </header>
 
@@ -111,6 +117,21 @@ export default async function initSidebarApp() {
   const telemetryBar = document.getElementById('telemetry-bar-fill') as HTMLDivElement
   const feedContainer = document.getElementById('capture-feed') as HTMLDivElement
   const feedCount = document.getElementById('feed-count') as HTMLSpanElement
+  const btnDockSidebar = document.getElementById('btn-dock-sidebar') as HTMLButtonElement | null
+
+  if (btnDockSidebar) {
+    btnDockSidebar.addEventListener('click', async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (tab?.windowId && chrome.sidePanel?.open) {
+          await chrome.sidePanel.open({ windowId: tab.windowId })
+          window.close()
+        }
+      } catch (err) {
+        console.warn('Could not open side panel:', err)
+      }
+    })
+  }
 
   async function renderFeed() {
     const items = await historyStore.list()

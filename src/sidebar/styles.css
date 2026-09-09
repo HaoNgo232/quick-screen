@@ -29,6 +29,9 @@ body {
   user-select: none;
   overflow-x: hidden;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  width: 380px;
+  min-width: 340px;
+  min-height: 520px;
 }
 
 .qs-shell {
@@ -86,6 +89,32 @@ body {
   font-weight: 450;
 }
 
+.qs-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qs-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qs-btn-icon:hover {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: rgba(56, 189, 248, 0.12);
+}
+
 .qs-status-pill {
   font-size: 10.5px;
   font-family: var(--font-mono);
@@ -96,7 +125,9 @@ body {
   border-radius: 4px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  font-weight: 550;
+  letter-spacing: 0.05em;
 }
 
 .qs-status-dot {

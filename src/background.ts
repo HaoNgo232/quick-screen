@@ -7,36 +7,36 @@ const isFirefoxLike =
   import.meta.env.EXTENSION_PUBLIC_BROWSER === 'gecko-based'
 
 if (isFirefoxLike) {
-  browser.browserAction.onClicked.addListener(() => {
-    browser.sidebarAction.open()
+  browser.browserAction?.onClicked?.addListener(() => {
+    browser.sidebarAction?.open()
   })
 
   browser.runtime.onMessage.addListener((message: any) => {
     if (!message || message.type !== 'openSidebar') return
-
-    browser.sidebarAction.open()
+    browser.sidebarAction?.open()
   })
 }
 
-if (!isFirefoxLike) {
-  // setPanelBehavior only affects FUTURE action clicks — registering it
-  // inside onClicked would swallow the first toolbar click.
-  chrome.sidePanel.setPanelBehavior({openPanelOnActionClick: true})
+if (!isFirefoxLike && chrome.sidePanel?.setPanelBehavior) {
+  // Keep openPanelOnActionClick false so toolbar click opens the floating Popup,
+  // preventing the webpage from being squeezed by the Side Panel!
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {})
 }
 
 chrome.runtime.onMessage.addListener((message) => {
   if (!message || message.type !== 'openSidebar') return
 
-  chrome.sidePanel.setPanelBehavior({openPanelOnActionClick: true})
-
-  if (!chrome.sidePanel.open) return
-
-  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const activeTabId = tabs && tabs[0] && tabs[0].id
-    if (!activeTabId) return
+    const windowId = tabs && tabs[0] && tabs[0].windowId
+    if (!chrome.sidePanel?.open) return
 
     try {
-      chrome.sidePanel.open({tabId: activeTabId})
+      if (activeTabId) {
+        chrome.sidePanel.open({ tabId: activeTabId })
+      } else if (windowId) {
+        chrome.sidePanel.open({ windowId })
+      }
     } catch (error) {
       console.error(error)
     }

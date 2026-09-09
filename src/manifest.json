@@ -20,7 +20,8 @@
       "64": "images/icon-64.png",
       "128": "images/icon-128.png"
     },
-    "default_title": "quick-screen Side Panel"
+    "default_title": "quick-screen",
+    "default_popup": "sidebar/index.html"
   },
   "firefox:browser_action": {
     "default_icon": {
