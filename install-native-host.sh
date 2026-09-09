@@ -118,6 +118,30 @@ def main():
                     'paths': paths,
                     'combinedPaths': combined_paths
                 })
+            elif action == 'open_file':
+                filepath = msg.get('filepath', '')
+                if not filepath or not os.path.exists(filepath):
+                    filename = msg.get('filename', '')
+                    filepath = os.path.join(TARGET_DIR, filename)
+                
+                if os.path.exists(filepath):
+                    subprocess.Popen(['xdg-open', filepath])
+                    send_message({'status': 'ok', 'filepath': filepath})
+                else:
+                    send_message({'status': 'error', 'error': 'File not found'})
+            elif action == 'read_file':
+                filepath = msg.get('filepath', '')
+                if not filepath or not os.path.exists(filepath):
+                    filename = msg.get('filename', '')
+                    filepath = os.path.join(TARGET_DIR, filename)
+                
+                if os.path.exists(filepath):
+                    with open(filepath, 'rb') as img_f:
+                        raw = img_f.read()
+                        b64 = base64.b64encode(raw).decode('utf-8')
+                    send_message({'status': 'ok', 'dataUrl': f'data:image/png;base64,{b64}'})
+                else:
+                    send_message({'status': 'error', 'error': 'File not found'})
             else:
                 send_message({'status': 'error', 'error': f'Unknown action: {action}'})
         except Exception as e:

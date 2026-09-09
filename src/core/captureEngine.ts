@@ -372,6 +372,26 @@ export class CaptureEngine {
     }
     return false
   }
+
+  /**
+   * Opens the captured image with the OS default image viewer via native host.
+   */
+  async openArtifact(filepath: string): Promise<boolean> {
+    if (this.sink.openFile) {
+      return await this.sink.openFile(filepath)
+    }
+    return false
+  }
+
+  /**
+   * Reads the full-resolution captured PNG image dataUrl via native host.
+   */
+  async readArtifactImage(filepath: string): Promise<string | null> {
+    if (this.sink.readFile) {
+      return await this.sink.readFile(filepath)
+    }
+    return null
+  }
 }
 
 export const captureEngine = new CaptureEngine()

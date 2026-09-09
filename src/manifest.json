@@ -40,6 +40,10 @@
     "default_panel": "sidebar/index.html",
     "default_title": "quick-screen History & Capture"
   },
+  "options_ui": {
+    "page": "options/index.html",
+    "open_in_tab": true
+  },
   "chromium:permissions": [
     "sidePanel",
     "activeTab",

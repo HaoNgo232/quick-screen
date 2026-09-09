@@ -7,6 +7,8 @@ export interface ArtifactSink {
   saveBatch?(items: { filename: string; dataUrl: string }[]): Promise<string[]>
   copyClipboard?(text: string): Promise<boolean>
   copyImage?(filepath: string): Promise<boolean>
+  readFile?(filepath: string): Promise<string | null>
+  openFile?(filepath: string): Promise<boolean>
 }
 
 /**
@@ -56,6 +58,42 @@ export class NativeHostSink implements ArtifactSink {
         chrome.runtime.sendNativeMessage(
           'com.quickscreen.host',
           { action: 'copy_image', filepath },
+          (response) => {
+            resolve(response?.status === 'ok')
+          }
+        )
+      } catch {
+        resolve(false)
+      }
+    })
+  }
+
+  async readFile(filepath: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendNativeMessage(
+          'com.quickscreen.host',
+          { action: 'read_file', filepath },
+          (response) => {
+            if (!chrome.runtime.lastError && response?.status === 'ok' && response.dataUrl) {
+              resolve(response.dataUrl)
+            } else {
+              resolve(null)
+            }
+          }
+        )
+      } catch {
+        resolve(null)
+      }
+    })
+  }
+
+  async openFile(filepath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendNativeMessage(
+          'com.quickscreen.host',
+          { action: 'open_file', filepath },
           (response) => {
             resolve(response?.status === 'ok')
           }
@@ -163,6 +201,20 @@ export class AutoSink implements ArtifactSink {
     if (this.nativeSink.copyImage) {
       const ok = await this.nativeSink.copyImage(filepath)
       if (ok) return true
+    }
+    return false
+  }
+
+  async readFile(filepath: string): Promise<string | null> {
+    if (this.nativeSink.readFile) {
+      return await this.nativeSink.readFile(filepath)
+    }
+    return null
+  }
+
+  async openFile(filepath: string): Promise<boolean> {
+    if (this.nativeSink.openFile) {
+      return await this.nativeSink.openFile(filepath)
     }
     return false
   }

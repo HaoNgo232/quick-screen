@@ -98,39 +98,6 @@ export default async function initSidebarApp() {
         </div>
       </div>
 
-      <!-- Hover Popover -->
-      <div id="qs-hover-popover" class="qs-hover-popover">
-        <img id="qs-hover-img" src="" alt="Preview" />
-      </div>
-
-      <!-- Lightbox Modal -->
-      <div id="qs-lightbox" class="qs-lightbox-backdrop">
-        <div class="qs-lightbox-header">
-          <div class="qs-lightbox-title-area">
-            <h2 id="lightbox-title" class="qs-lightbox-title">Screenshot</h2>
-            <span id="lightbox-meta" class="qs-lightbox-meta"></span>
-          </div>
-          <div class="qs-lightbox-actions">
-            <button id="lightbox-btn-path" class="qs-tool-btn qs-tool-btn-primary" type="button">
-              ${ICONS.copy}
-              <span>Path</span>
-            </button>
-            <button id="lightbox-btn-image" class="qs-tool-btn" type="button">
-              ${ICONS.image}
-              <span>Image</span>
-            </button>
-            <button id="lightbox-btn-close" class="qs-tool-btn qs-tool-btn-danger" type="button" title="Close (Esc)">
-              ${ICONS.close}
-            </button>
-          </div>
-        </div>
-        <div class="qs-lightbox-body" id="lightbox-body">
-          <div class="qs-lightbox-viewport">
-            <img id="lightbox-img" src="" alt="Full preview" />
-          </div>
-        </div>
-      </div>
-
       <!-- Toast Feedback -->
       <div id="qs-toast" class="qs-toast-overlay"></div>
     </div>
@@ -144,69 +111,6 @@ export default async function initSidebarApp() {
   const telemetryBar = document.getElementById('telemetry-bar-fill') as HTMLDivElement
   const feedContainer = document.getElementById('capture-feed') as HTMLDivElement
   const feedCount = document.getElementById('feed-count') as HTMLSpanElement
-
-  // Hover Popover elements
-  const hoverPopover = document.getElementById('qs-hover-popover') as HTMLDivElement
-  const hoverImg = document.getElementById('qs-hover-img') as HTMLImageElement
-
-  // Lightbox elements
-  const lightbox = document.getElementById('qs-lightbox') as HTMLDivElement
-  const lightboxTitle = document.getElementById('lightbox-title') as HTMLHeadingElement
-  const lightboxMeta = document.getElementById('lightbox-meta') as HTMLSpanElement
-  const lightboxImg = document.getElementById('lightbox-img') as HTMLImageElement
-  const lightboxBtnClose = document.getElementById('lightbox-btn-close') as HTMLButtonElement
-  const lightboxBtnPath = document.getElementById('lightbox-btn-path') as HTMLButtonElement
-  const lightboxBtnImage = document.getElementById('lightbox-btn-image') as HTMLButtonElement
-
-  let activeLightboxItem: CaptureItem | null = null
-
-  function openLightbox(item: CaptureItem) {
-    activeLightboxItem = item
-    lightboxTitle.textContent = item.pageTitle
-    lightboxTitle.title = item.pageTitle
-    lightboxMeta.textContent = `${item.width}×${item.height}px`
-    lightboxImg.src = item.thumbnailDataUrl
-    lightbox.classList.add('open')
-  }
-
-  function closeLightbox() {
-    lightbox.classList.remove('open')
-    activeLightboxItem = null
-  }
-
-  lightboxBtnClose.addEventListener('click', closeLightbox)
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox || e.target === document.getElementById('lightbox-body')) {
-      closeLightbox()
-    }
-  })
-
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && lightbox.classList.contains('open')) {
-      closeLightbox()
-    }
-  })
-
-  lightboxBtnPath.addEventListener('click', async () => {
-    if (activeLightboxItem) {
-      await captureEngine.copyTextArtifact(activeLightboxItem.absolutePath)
-      notify('Path copied to clipboard')
-    }
-  })
-
-  lightboxBtnImage.addEventListener('click', async () => {
-    if (activeLightboxItem) {
-      const ok = await captureEngine.copyImageArtifact(
-        activeLightboxItem.absolutePath,
-        activeLightboxItem.thumbnailDataUrl
-      )
-      if (ok) {
-        notify('Raw image copied to clipboard')
-      } else {
-        notify('Failed to copy image')
-      }
-    }
-  })
 
   async function renderFeed() {
     const items = await historyStore.list()
@@ -227,7 +131,7 @@ export default async function initSidebarApp() {
       .map(
         (item: CaptureItem) => `
         <article class="qs-item" data-id="${item.id}">
-          <div class="qs-item-thumb" data-id="${item.id}" title="Click to view full preview">
+          <div class="qs-item-thumb" data-id="${item.id}" title="Click to open full-page viewer in new tab">
             <img src="${item.thumbnailDataUrl}" alt="${item.pageTitle}" loading="lazy" />
           </div>
           <div class="qs-item-body">
@@ -291,30 +195,15 @@ export default async function initSidebarApp() {
       })
     })
 
-    // Bind hover and click preview on thumbnails
+    // Bind click on thumbnails to open full-page Viewer Tab
     feedContainer.querySelectorAll<HTMLDivElement>('.qs-item-thumb').forEach((thumb) => {
-      const id = thumb.getAttribute('data-id')
-      const item = items.find((i) => i.id === id)
-      if (!item) return
-
-      // Hover preview popover
-      thumb.addEventListener('mouseenter', () => {
-        const rect = thumb.getBoundingClientRect()
-        hoverImg.src = item.thumbnailDataUrl
-        const topPos = Math.max(10, Math.min(window.innerHeight - 370, rect.top - 20))
-        hoverPopover.style.top = `${topPos}px`
-        hoverPopover.style.left = '16px'
-        hoverPopover.classList.add('visible')
-      })
-
-      thumb.addEventListener('mouseleave', () => {
-        hoverPopover.classList.remove('visible')
-      })
-
-      // Click to open Lightbox Modal
       thumb.addEventListener('click', () => {
-        hoverPopover.classList.remove('visible')
-        openLightbox(item)
+        const id = thumb.getAttribute('data-id')
+        if (id) {
+          chrome.tabs.create({
+            url: chrome.runtime.getURL(`options/index.html?id=${encodeURIComponent(id)}`)
+          })
+        }
       })
     })
   }
