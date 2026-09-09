@@ -2,9 +2,15 @@ import { describe, it, expect } from 'bun:test'
 import { spawn } from 'child_process'
 import * as fs from 'fs'
 
+import * as path from 'path'
+
+const HOST_PATH = fs.existsSync((process.env.HOME + '/.local/bin/quick-screen-host'))
+  ? (process.env.HOME + '/.local/bin/quick-screen-host')
+  : path.resolve(__dirname, '../native-host/quick_screen_host.py')
+
 describe('Native Messaging Host Bridge', () => {
   it('responds to ping with status ok and pong true', async () => {
-    const proc = spawn((process.env.HOME + '/.local/bin/quick-screen-host'), [], {
+    const proc = spawn(HOST_PATH, [], {
       stdio: ['pipe', 'pipe', 'inherit']
     })
 
@@ -29,7 +35,7 @@ describe('Native Messaging Host Bridge', () => {
   })
 
   it('saves base64 png directly to /tmp/quick-screen', async () => {
-    const proc = spawn((process.env.HOME + '/.local/bin/quick-screen-host'), [], {
+    const proc = spawn(HOST_PATH, [], {
       stdio: ['pipe', 'pipe', 'inherit']
     })
 
@@ -71,7 +77,7 @@ describe('Native Messaging Host Bridge', () => {
     fs.mkdirSync('/tmp/quick-screen', { recursive: true })
     fs.writeFileSync(testFile, Buffer.from('fake-png'))
 
-    const proc = spawn((process.env.HOME + '/.local/bin/quick-screen-host'), [], {
+    const proc = spawn(HOST_PATH, [], {
       stdio: ['pipe', 'pipe', 'inherit']
     })
 
@@ -102,7 +108,7 @@ describe('Native Messaging Host Bridge', () => {
     fs.mkdirSync('/tmp/quick-screen', { recursive: true })
     fs.writeFileSync(testFile, Buffer.from('quick-screen-test-data'))
 
-    const proc = spawn((process.env.HOME + '/.local/bin/quick-screen-host'), [], {
+    const proc = spawn(HOST_PATH, [], {
       stdio: ['pipe', 'pipe', 'inherit']
     })
 
@@ -134,7 +140,7 @@ describe('Native Messaging Host Bridge', () => {
     const content = Buffer.from('hello-world-quick-screen-chunked-data')
     fs.writeFileSync(testFile, content)
 
-    const proc = spawn((process.env.HOME + '/.local/bin/quick-screen-host'), [], {
+    const proc = spawn(HOST_PATH, [], {
       stdio: ['pipe', 'pipe', 'inherit']
     })
 
