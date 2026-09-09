@@ -1,12 +1,6 @@
-import {
-  captureFullPage,
-  captureAllTabs,
-  getRecentCaptures,
-  clearRecentCaptures,
-  deleteCapture,
-  copyPathOnly,
-  copyDualClipboard
-} from './captureEngine'
+import { captureEngine } from '../core/captureEngine'
+import { historyStore } from '../core/historyStore'
+import { copyText, copyDual } from '../core/clipboard'
 import type { CaptureItem } from '../types/capture'
 
 let isCapturing = false
@@ -98,7 +92,7 @@ export default async function initSidebarApp() {
   const historyCount = document.getElementById('history-count') as HTMLSpanElement
 
   async function renderHistory() {
-    const items = await getRecentCaptures()
+    const items = await historyStore.list()
     historyCount.textContent = String(items.length)
 
     if (items.length === 0) {
@@ -114,7 +108,7 @@ export default async function initSidebarApp() {
 
     historyList.innerHTML = items
       .map(
-        (item) => `
+        (item: CaptureItem) => `
         <div class="qs-card" data-id="${item.id}">
           <div class="qs-card-thumb">
             <img src="${item.thumbnailDataUrl}" alt="${item.pageTitle}" loading="lazy" />
@@ -141,12 +135,12 @@ export default async function initSidebarApp() {
       )
       .join('')
 
-    // Bind event listeners for card buttons
+    // Bind card action buttons
     historyList.querySelectorAll<HTMLButtonElement>('.qs-btn-copy-path').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const path = btn.getAttribute('data-path')
         if (path) {
-          await copyPathOnly(path)
+          await copyText(path)
           showSidebarToast('✓ Đã copy đường dẫn vào clipboard!')
         }
       })
@@ -160,11 +154,11 @@ export default async function initSidebarApp() {
           try {
             const res = await fetch(item.thumbnailDataUrl)
             const blob = await res.blob()
-            await copyDualClipboard(item.absolutePath, blob)
+            await copyDual(item.absolutePath, blob)
             showSidebarToast('✓ Đã copy ảnh & path vào clipboard!')
           } catch (err) {
             console.error(err)
-            await copyPathOnly(item.absolutePath)
+            await copyText(item.absolutePath)
             showSidebarToast('✓ Đã copy đường dẫn!')
           }
         }
@@ -175,7 +169,7 @@ export default async function initSidebarApp() {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id')
         if (id) {
-          await deleteCapture(id)
+          await historyStore.remove(id)
           await renderHistory()
           showSidebarToast('Đã xóa khỏi lịch sử')
         }
@@ -194,13 +188,7 @@ export default async function initSidebarApp() {
     progressMsg.textContent = 'Đang chuẩn bị...'
 
     try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-      const activeTab = tabs[0]
-      if (!activeTab || !activeTab.id) {
-        throw new Error('Không tìm thấy tab đang kích hoạt')
-      }
-
-      await captureFullPage(activeTab, (p) => {
+      await captureEngine.captureActive((p) => {
         progressMsg.textContent = p.message || 'Đang chụp...'
         const percent = Math.round((p.currentSlice / Math.max(1, p.totalSlices)) * 100)
         progressFill.style.width = `${percent}%`
@@ -233,7 +221,7 @@ export default async function initSidebarApp() {
     progressMsg.textContent = 'Đang quét danh sách các tab...'
 
     try {
-      const result = await captureAllTabs((msg, current, total) => {
+      const result = await captureEngine.captureBatch((msg, current, total) => {
         progressMsg.textContent = msg
         const percent = Math.round((current / Math.max(1, total)) * 100)
         progressFill.style.width = `${percent}%`
@@ -258,7 +246,7 @@ export default async function initSidebarApp() {
   // Clear history
   btnClearHistory.addEventListener('click', async () => {
     if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong danh sách không?')) {
-      await clearRecentCaptures()
+      await historyStore.clear()
       await renderHistory()
       showSidebarToast('Đã dọn sạch lịch sử')
     }
