@@ -83,19 +83,31 @@ async function ensureContentScript(tabId: number, retries = 3): Promise<boolean>
 
 let lastCaptureTime = 0
 
-async function safeCaptureVisibleTab(windowId?: number, retries = 5): Promise<string> {
+async function safeCaptureVisibleTab(windowId?: number, retries = 5, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) {
+    throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+  }
   const minInterval = 550 // Minimum 550ms interval between calls to safely conform to MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND (2/sec)
   const elapsed = Date.now() - lastCaptureTime
   if (elapsed < minInterval) {
     await new Promise((r) => setTimeout(r, minInterval - elapsed))
+    if (signal?.aborted) {
+      throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+    }
   }
 
   for (let attempt = 0; attempt < retries; attempt++) {
+    if (signal?.aborted) {
+      throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+    }
     try {
       lastCaptureTime = Date.now()
       const targetWindowId = windowId || chrome.windows.WINDOW_ID_CURRENT
       return await chrome.tabs.captureVisibleTab(targetWindowId, { format: 'png' })
     } catch (err: any) {
+      if (signal?.aborted) {
+        throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+      }
       const msg = String(err?.message || '')
       if ((msg.includes('MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND') || msg.includes('quota')) && attempt < retries - 1) {
         // Backoff wait if Chromium's token bucket is exhausted
@@ -112,6 +124,7 @@ export interface CaptureTabOptions {
   onProgress?: (p: CaptureProgress) => void
   skipClipboard?: boolean
   skipToast?: boolean
+  signal?: AbortSignal
 }
 
 /**
@@ -150,9 +163,13 @@ export class CaptureEngine {
       } catch {}
     }
 
+    if (options?.signal?.aborted) {
+      throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
+    }
+
     if (!dims) {
       // Fallback to visible viewport capture for restricted or unscriptable pages
-      const dataUrl = await safeCaptureVisibleTab(tab.windowId)
+      const dataUrl = await safeCaptureVisibleTab(tab.windowId, 5, options?.signal)
       const img = await loadImage(dataUrl)
       const canvasWidth = img.width
       const canvasHeight = img.height
@@ -245,52 +262,67 @@ export class CaptureEngine {
     let drawnHeight = 0
 
     // 4. Scroll, capture and stitch
-    for (let i = 0; i < totalSlices; i++) {
-      const slice = slices[i]
-      options?.onProgress?.({
-        currentSlice: i + 1,
-        totalSlices,
-        status: 'scrolling',
-        message: `Đang cuộn và chụp khung ${i + 1}/${totalSlices}...`
-      })
-
-      await chrome.tabs.sendMessage(tab.id, {
-        type: 'SCROLL_TO',
-        x: 0,
-        y: slice.y,
-        hideFixed: i > 0
-      })
-
-      const dataUrl = await safeCaptureVisibleTab(tab.windowId)
-      const img = await loadImage(dataUrl)
-
-      options?.onProgress?.({
-        currentSlice: i + 1,
-        totalSlices,
-        status: 'stitching',
-        message: `Đang ghép mảnh ${i + 1}/${totalSlices}...`
-      })
-
-      if (!slice.isLast) {
-        const sliceDestY = Math.round(slice.y * devicePixelRatio * scale)
-        const sliceDestH = Math.round(viewportHeight * devicePixelRatio * scale)
-        ctx.drawImage(img, 0, 0, img.width, img.height, 0, sliceDestY, canvasWidth, sliceDestH)
-        drawnHeight = slice.y + viewportHeight
-      } else {
-        const remainingUnscaled = totalHeight - drawnHeight
-        if (remainingUnscaled > 0) {
-          const sourceRemnantH = Math.round(remainingUnscaled * (img.height / viewportHeight))
-          const sourceStartY = img.height - sourceRemnantH
-          const destY = Math.round(drawnHeight * devicePixelRatio * scale)
-          const destH = canvasHeight - destY
-
-          ctx.drawImage(img, 0, sourceStartY, img.width, sourceRemnantH, 0, destY, canvasWidth, destH)
+    try {
+      for (let i = 0; i < totalSlices; i++) {
+        if (options?.signal?.aborted) {
+          throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
         }
+        const slice = slices[i]
+        options?.onProgress?.({
+          currentSlice: i + 1,
+          totalSlices,
+          status: 'scrolling',
+          message: `Đang cuộn và chụp khung ${i + 1}/${totalSlices}...`
+        })
+
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'SCROLL_TO',
+          x: 0,
+          y: slice.y,
+          hideFixed: i > 0
+        })
+
+        const dataUrl = await safeCaptureVisibleTab(tab.windowId, 5, options?.signal)
+        const img = await loadImage(dataUrl)
+
+        if (options?.signal?.aborted) {
+          throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
+        }
+
+        options?.onProgress?.({
+          currentSlice: i + 1,
+          totalSlices,
+          status: 'stitching',
+          message: `Đang ghép mảnh ${i + 1}/${totalSlices}...`
+        })
+
+        if (!slice.isLast) {
+          const sliceDestY = Math.round(slice.y * devicePixelRatio * scale)
+          const sliceDestH = Math.round(viewportHeight * devicePixelRatio * scale)
+          ctx.drawImage(img, 0, 0, img.width, img.height, 0, sliceDestY, canvasWidth, sliceDestH)
+          drawnHeight = slice.y + viewportHeight
+        } else {
+          const remainingUnscaled = totalHeight - drawnHeight
+          if (remainingUnscaled > 0) {
+            const sourceRemnantH = Math.round(remainingUnscaled * (img.height / viewportHeight))
+            const sourceStartY = img.height - sourceRemnantH
+            const destY = Math.round(drawnHeight * devicePixelRatio * scale)
+            const destH = canvasHeight - destY
+
+            ctx.drawImage(img, 0, sourceStartY, img.width, sourceRemnantH, 0, destY, canvasWidth, destH)
+          }
+        }
+      }
+    } finally {
+      // 5. Restore page DOM state safely
+      if (hasScript) {
+        await chrome.tabs.sendMessage(tab.id, { type: 'RESTORE_CAPTURE' }).catch(() => {})
       }
     }
 
-    // 5. Restore page DOM state
-    await chrome.tabs.sendMessage(tab.id, { type: 'RESTORE_CAPTURE' })
+    if (options?.signal?.aborted) {
+      throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
+    }
 
     options?.onProgress?.({
       currentSlice: totalSlices,
@@ -372,20 +404,24 @@ export class CaptureEngine {
   /**
    * Captures the active tab in current window.
    */
-  async captureActive(onProgress?: (p: CaptureProgress) => void): Promise<CaptureItem> {
+  async captureActive(
+    onProgress?: (p: CaptureProgress) => void,
+    signal?: AbortSignal
+  ): Promise<CaptureItem> {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     const activeTab = tabs[0]
     if (!activeTab || !activeTab.id) {
       throw new Error('Không tìm thấy tab đang kích hoạt')
     }
-    return this.captureTab(activeTab, { onProgress })
+    return this.captureTab(activeTab, { onProgress, signal })
   }
 
   /**
    * Captures all open tabs across the current browser window.
    */
   async captureBatch(
-    onProgress?: (status: string, current: number, total: number) => void
+    onProgress?: (status: string, current: number, total: number) => void,
+    signal?: AbortSignal
   ): Promise<{ items: CaptureItem[]; combinedPaths: string }> {
     const tabs = await chrome.tabs.query({ currentWindow: true })
     const validTabs = tabs.filter(
@@ -407,6 +443,7 @@ export class CaptureEngine {
     const capturedItems: CaptureItem[] = []
 
     for (let i = 0; i < validTabs.length; i++) {
+      if (signal?.aborted) break
       const targetTab = validTabs[i]
       if (!targetTab.id) continue
 
@@ -418,22 +455,35 @@ export class CaptureEngine {
 
       try {
         await chrome.tabs.update(targetTab.id, { active: true })
+        if (signal?.aborted) break
         const readyTab = await waitForTabReady(targetTab.id)
+        if (signal?.aborted) break
         await new Promise((r) => setTimeout(r, 450))
+        if (signal?.aborted) break
 
         const item = await this.captureTab(readyTab || targetTab, {
           skipClipboard: true,
-          skipToast: true
+          skipToast: true,
+          signal
         })
         capturedItems.push(item)
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || signal?.aborted) {
+          break
+        }
         console.error(`Lỗi khi chụp tab ${targetTab.id}:`, err)
       }
     }
 
     if (initialActiveTabId) {
-      await chrome.tabs.update(initialActiveTabId, { active: true })
-      await new Promise((r) => setTimeout(r, 200))
+      try {
+        await chrome.tabs.update(initialActiveTabId, { active: true })
+        await new Promise((r) => setTimeout(r, 200))
+      } catch {}
+    }
+
+    if (signal?.aborted && capturedItems.length === 0) {
+      throw new DOMException('Quá trình chụp batch đã bị dừng bởi người dùng', 'AbortError')
     }
 
     const combinedPaths = capturedItems.map((i) => i.absolutePath).join('\n')

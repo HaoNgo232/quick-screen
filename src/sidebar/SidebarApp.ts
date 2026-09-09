@@ -81,6 +81,10 @@ export default async function initSidebarApp() {
               <div id="telemetry-bar-fill" class="qs-progress-fill" style="width: 0%;"></div>
             </div>
           </div>
+          <button id="btn-cancel-capture" class="qs-btn-cancel" type="button" title="Dừng chụp">
+            ${ICONS.close}
+            <span>Stop</span>
+          </button>
         </div>
       </section>
 
@@ -104,14 +108,14 @@ export default async function initSidebarApp() {
         </div>
       </div>
 
-      <!-- Toast Feedback -->
-      <div id="qs-toast" class="qs-toast-overlay"></div>
-    </div>
+    <!-- Toast Notification -->
+    <div id="qs-toast" class="qs-toast"></div>
   `
 
   const btnCaptureActive = document.getElementById('btn-capture-active') as HTMLButtonElement
   const btnCaptureBatch = document.getElementById('btn-capture-batch') as HTMLButtonElement
   const btnPurge = document.getElementById('btn-purge-history') as HTMLButtonElement
+  const btnCancelCapture = document.getElementById('btn-cancel-capture') as HTMLButtonElement | null
   const telemetryBox = document.getElementById('telemetry-box') as HTMLDivElement
   const telemetryMsg = document.getElementById('telemetry-message') as HTMLSpanElement
   const telemetryBar = document.getElementById('telemetry-bar-fill') as HTMLDivElement
@@ -229,29 +233,46 @@ export default async function initSidebarApp() {
     })
   }
 
+  let activeAbortController: AbortController | null = null
+
+  btnCancelCapture?.addEventListener('click', () => {
+    if (activeAbortController) {
+      telemetryMsg.textContent = 'Stopping capture...'
+      if (btnCancelCapture) btnCancelCapture.disabled = true
+      activeAbortController.abort()
+    }
+  })
+
   // Active Tab Capture
   btnCaptureActive.addEventListener('click', async () => {
     if (isBusy) return
     isBusy = true
     btnCaptureActive.disabled = true
     btnCaptureBatch.disabled = true
+    if (btnCancelCapture) btnCancelCapture.disabled = false
     telemetryBox.style.display = 'flex'
     telemetryBar.style.width = '10%'
     telemetryMsg.textContent = 'Measuring viewport...'
+    activeAbortController = new AbortController()
 
     try {
       await captureEngine.captureActive((p) => {
         telemetryMsg.textContent = p.message || 'Capturing...'
         const percent = Math.round((p.currentSlice / Math.max(1, p.totalSlices)) * 100)
         telemetryBar.style.width = `${percent}%`
-      })
+      }, activeAbortController.signal)
 
       notify('Capture complete & path copied')
       await renderFeed()
     } catch (err: any) {
-      console.error('Capture error:', err)
-      notify(`Error: ${err?.message || 'Capture failed'}`)
+      if (err?.name === 'AbortError' || activeAbortController?.signal.aborted) {
+        notify('Capture stopped by user')
+      } else {
+        console.error('Capture error:', err)
+        notify(`Error: ${err?.message || 'Capture failed'}`)
+      }
     } finally {
+      activeAbortController = null
       isBusy = false
       btnCaptureActive.disabled = false
       btnCaptureBatch.disabled = false
@@ -286,23 +307,34 @@ export default async function initSidebarApp() {
     isBusy = true
     btnCaptureActive.disabled = true
     btnCaptureBatch.disabled = true
+    if (btnCancelCapture) btnCancelCapture.disabled = false
     telemetryBox.style.display = 'flex'
     telemetryBar.style.width = '5%'
     telemetryMsg.textContent = 'Indexing open tabs...'
+    activeAbortController = new AbortController()
 
     try {
       const result = await captureEngine.captureBatch((msg, current, total) => {
         telemetryMsg.textContent = msg
         const percent = Math.round((current / Math.max(1, total)) * 100)
         telemetryBar.style.width = `${percent}%`
-      })
+      }, activeAbortController.signal)
 
-      notify(`Captured ${result.items.length} tabs & paths copied`)
-      await renderFeed()
+      if (result.items.length > 0) {
+        notify(`Captured ${result.items.length} tabs & paths copied`)
+        await renderFeed()
+      } else {
+        notify('Batch capture stopped')
+      }
     } catch (err: any) {
-      console.error('Batch error:', err)
-      notify(`Error: ${err?.message || 'Batch capture failed'}`)
+      if (err?.name === 'AbortError' || activeAbortController?.signal.aborted) {
+        notify('Batch capture stopped')
+      } else {
+        console.error('Batch error:', err)
+        notify(`Error: ${err?.message || 'Batch capture failed'}`)
+      }
     } finally {
+      activeAbortController = null
       isBusy = false
       btnCaptureActive.disabled = false
       btnCaptureBatch.disabled = false
