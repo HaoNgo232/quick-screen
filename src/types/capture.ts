@@ -18,6 +18,7 @@ export interface CaptureItem {
   thumbnailDataUrl: string
   width: number
   height: number
+  dataUrl?: string
 }
 
 export interface CaptureProgress {

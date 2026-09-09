@@ -124,6 +124,7 @@ export interface CaptureTabOptions {
   onProgress?: (p: CaptureProgress) => void
   skipClipboard?: boolean
   skipToast?: boolean
+  skipSave?: boolean
   signal?: AbortSignal
 }
 
@@ -199,13 +200,16 @@ export class CaptureEngine {
       const pageTitle = tab.title || 'webpage'
       const url = tab.url || ''
       const filename = sanitizeFilename(pageTitle)
-      const shouldCopy = !options?.skipClipboard
-      const absolutePath = await this.sink.save(filename, dataUrl, shouldCopy)
+      const shouldCopy = !options?.skipClipboard && !options?.skipSave
+      let absolutePath = ''
 
-      if (shouldCopy) {
-        const ok = await copyDual(absolutePath, imageBlob)
-        if (!ok && this.sink.copyClipboard) {
-          await this.sink.copyClipboard(absolutePath)
+      if (!options?.skipSave) {
+        absolutePath = await this.sink.save(filename, dataUrl, shouldCopy)
+        if (shouldCopy) {
+          const ok = await copyDual(absolutePath, imageBlob)
+          if (!ok && this.sink.copyClipboard) {
+            await this.sink.copyClipboard(absolutePath)
+          }
         }
       }
 
@@ -218,10 +222,13 @@ export class CaptureEngine {
         timestamp: Date.now(),
         thumbnailDataUrl,
         width: canvasWidth,
-        height: canvasHeight
+        height: canvasHeight,
+        dataUrl: options?.skipSave ? dataUrl : undefined
       }
 
-      await this.history.add(captureItem)
+      if (!options?.skipSave) {
+        await this.history.add(captureItem)
+      }
       await putImageBlob(captureItem.id, imageBlob)
       return captureItem
     }
@@ -351,28 +358,32 @@ export class CaptureEngine {
       }, 'image/png')
     })
 
-    // 8. Persist through ArtifactSink seam
+    // 8. Persist through ArtifactSink seam (or defer if skipSave)
     const filename = sanitizeFilename(pageTitle)
-    const shouldCopy = !options?.skipClipboard
-    const absolutePath = await this.sink.save(filename, fullDataUrl, shouldCopy)
+    const shouldCopy = !options?.skipClipboard && !options?.skipSave
+    let absolutePath = ''
 
-    // 9. Write dual clipboard (only if not in batch mode)
-    if (shouldCopy) {
-      const ok = await copyDual(absolutePath, imageBlob)
-      if (!ok && this.sink.copyClipboard) {
-        await this.sink.copyClipboard(absolutePath)
+    if (!options?.skipSave) {
+      absolutePath = await this.sink.save(filename, fullDataUrl, shouldCopy)
+
+      // 9. Write dual clipboard (only if not in batch mode)
+      if (shouldCopy) {
+        const ok = await copyDual(absolutePath, imageBlob)
+        if (!ok && this.sink.copyClipboard) {
+          await this.sink.copyClipboard(absolutePath)
+        }
       }
-    }
 
-    // 10. Trigger in-page toast feedback (only if not in batch mode)
-    if (!options?.skipToast) {
-      try {
-        await chrome.tabs.sendMessage(tab.id, {
-          type: 'SHOW_TOAST',
-          message: 'Đã chụp & copy path vào clipboard!',
-          filePath: absolutePath
-        })
-      } catch {}
+      // 10. Trigger in-page toast feedback (only if not in batch mode)
+      if (!options?.skipToast) {
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            type: 'SHOW_TOAST',
+            message: 'Đã chụp & copy path vào clipboard!',
+            filePath: absolutePath
+          })
+        } catch {}
+      }
     }
 
     const captureItem: CaptureItem = {
@@ -384,11 +395,14 @@ export class CaptureEngine {
       timestamp: Date.now(),
       thumbnailDataUrl,
       width: canvasWidth,
-      height: canvasHeight
+      height: canvasHeight,
+      dataUrl: options?.skipSave ? fullDataUrl : undefined
     }
 
-    // 11. Record into history and cache full resolution blob in IndexedDB
-    await this.history.add(captureItem)
+    // 11. Record into history (if saved) and cache full resolution blob in IndexedDB
+    if (!options?.skipSave) {
+      await this.history.add(captureItem)
+    }
     await putImageBlob(captureItem.id, imageBlob)
 
     options?.onProgress?.({
@@ -440,8 +454,9 @@ export class CaptureEngine {
 
     const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true })
     const initialActiveTabId = activeTabs[0]?.id
-    const capturedItems: CaptureItem[] = []
+    const pendingItems: { item: CaptureItem; dataUrl: string }[] = []
 
+    // Giai đoạn 1: Quét và stitch ảnh của tất cả các tab (KHÔNG gọi lưu để tránh popup)
     for (let i = 0; i < validTabs.length; i++) {
       if (signal?.aborted) break
       const targetTab = validTabs[i]
@@ -464,9 +479,12 @@ export class CaptureEngine {
         const item = await this.captureTab(readyTab || targetTab, {
           skipClipboard: true,
           skipToast: true,
+          skipSave: true, // Hoãn lưu file cho đến khi scan xong toàn bộ!
           signal
         })
-        capturedItems.push(item)
+        if (item.dataUrl) {
+          pendingItems.push({ item, dataUrl: item.dataUrl })
+        }
       } catch (err: any) {
         if (err?.name === 'AbortError' || signal?.aborted) {
           break
@@ -475,6 +493,7 @@ export class CaptureEngine {
       }
     }
 
+    // Trở về tab ban đầu ngay khi quét xong
     if (initialActiveTabId) {
       try {
         await chrome.tabs.update(initialActiveTabId, { active: true })
@@ -482,24 +501,46 @@ export class CaptureEngine {
       } catch {}
     }
 
-    if (signal?.aborted && capturedItems.length === 0) {
+    if (signal?.aborted && pendingItems.length === 0) {
       throw new DOMException('Quá trình chụp batch đã bị dừng bởi người dùng', 'AbortError')
     }
 
-    const combinedPaths = capturedItems.map((i) => i.absolutePath).join('\n')
+    // Giai đoạn 2: Lưu toàn bộ ảnh đã quét và thu thập đường dẫn tuyệt đối
+    const capturedItems: CaptureItem[] = []
+    for (let i = 0; i < pendingItems.length; i++) {
+      if (signal?.aborted) break
+      const { item, dataUrl } = pendingItems[i]
 
-    // 1. Copy via native host (X11 / Wayland OS level)
+      onProgress?.(
+        `Đang lưu file ${i + 1}/${pendingItems.length}: ${item.filename}`,
+        i + 1,
+        pendingItems.length
+      )
+
+      try {
+        const absolutePath = await this.sink.save(item.filename, dataUrl, false)
+        item.absolutePath = absolutePath
+        delete item.dataUrl
+        await this.history.add(item)
+        capturedItems.push(item)
+      } catch (err: any) {
+        console.error(`Lỗi khi lưu ảnh ${item.filename}:`, err)
+      }
+    }
+
+    const combinedPaths = capturedItems.map((i) => i.absolutePath).filter(Boolean).join('\n')
+
+    // Copy danh sách đường dẫn vào Clipboard
     if (this.sink.copyClipboard) {
       await this.sink.copyClipboard(combinedPaths)
     }
-    // 2. Also copy via browser clipboard
     await copyText(combinedPaths)
 
     if (initialActiveTabId) {
       try {
         await chrome.tabs.sendMessage(initialActiveTabId, {
           type: 'SHOW_TOAST',
-          message: `Đã chụp ${capturedItems.length} tabs & copy toàn bộ path!`,
+          message: `Đã chụp & lưu ${capturedItems.length} tabs!`,
           filePath: `${capturedItems.length} đường dẫn đã nạp vào clipboard`
         })
       } catch {}
