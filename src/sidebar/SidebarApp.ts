@@ -1,6 +1,5 @@
 import { captureEngine } from '../core/captureEngine'
 import { historyStore } from '../core/historyStore'
-import { copyText } from '../core/clipboard'
 import type { CaptureItem } from '../types/capture'
 
 let isBusy = false
@@ -190,7 +189,7 @@ export default async function initSidebarApp() {
 
   lightboxBtnPath.addEventListener('click', async () => {
     if (activeLightboxItem) {
-      await copyText(activeLightboxItem.absolutePath)
+      await captureEngine.copyTextArtifact(activeLightboxItem.absolutePath)
       notify('Path copied to clipboard')
     }
   })
@@ -260,7 +259,7 @@ export default async function initSidebarApp() {
       btn.addEventListener('click', async () => {
         const path = btn.getAttribute('data-path')
         if (path) {
-          await copyText(path)
+          await captureEngine.copyTextArtifact(path)
           notify('Path copied to clipboard')
         }
       })

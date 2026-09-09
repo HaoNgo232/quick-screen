@@ -208,7 +208,10 @@ export class CaptureEngine {
 
     // 9. Write dual clipboard (only if not in batch mode)
     if (shouldCopy) {
-      await copyDual(absolutePath, imageBlob)
+      const ok = await copyDual(absolutePath, imageBlob)
+      if (!ok && this.sink.copyClipboard) {
+        await this.sink.copyClipboard(absolutePath)
+      }
     }
 
     // 10. Trigger in-page toast feedback (only if not in batch mode)
@@ -333,6 +336,18 @@ export class CaptureEngine {
     }
 
     return { items: capturedItems, combinedPaths }
+  }
+
+  /**
+   * Copies text/path to clipboard.
+   * Prioritizes native host (xclip) for OS clipboard reliability, falling back to browser clipboard.
+   */
+  async copyTextArtifact(text: string): Promise<boolean> {
+    if (this.sink.copyClipboard) {
+      const ok = await this.sink.copyClipboard(text)
+      if (ok) return true
+    }
+    return copyText(text)
   }
 
   /**
