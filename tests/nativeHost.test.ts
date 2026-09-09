@@ -2,10 +2,12 @@ import { describe, it, expect } from 'bun:test'
 import { spawn } from 'child_process'
 import * as fs from 'fs'
 
+import * as os from 'os'
 import * as path from 'path'
 
-const HOST_PATH = fs.existsSync((process.env.HOME + '/.local/bin/quick-screen-host'))
-  ? (process.env.HOME + '/.local/bin/quick-screen-host')
+const DEFAULT_BIN = path.join(os.homedir(), '.local/bin/quick-screen-host')
+const HOST_PATH = fs.existsSync(DEFAULT_BIN)
+  ? DEFAULT_BIN
   : path.resolve(__dirname, '../native-host/quick_screen_host.py')
 
 describe('Native Messaging Host Bridge', () => {
