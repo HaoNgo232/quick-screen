@@ -3,22 +3,34 @@ import { historyStore } from '../core/historyStore'
 import { copyText, copyDual } from '../core/clipboard'
 import type { CaptureItem } from '../types/capture'
 
-let isCapturing = false
+let isBusy = false
 
-function formatTime(timestamp: number): string {
+// Crisp vector SVG definitions (Stroke 1.75 - 2, geometric, minimal)
+const ICONS = {
+  viewfinder: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M4 16v3a1 1 0 0 0 1 1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M16 20h3a1 1 0 0 0 1-1v-3"/><circle cx="12" cy="12" r="3"/><line x1="8" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="16" y2="12"/></svg>`,
+  camera: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+  layers: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
+  copy: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  image: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+  trash: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  check: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  emptyFrame: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`
+}
+
+function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} - ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`
 }
 
-function showSidebarToast(text: string) {
-  const toast = document.getElementById('sidebar-toast')
+function notify(text: string) {
+  const toast = document.getElementById('qs-toast')
   if (!toast) return
-  toast.textContent = text
-  toast.classList.add('visible')
+  toast.innerHTML = `${ICONS.check} <span>${text}</span>`
+  toast.classList.add('active')
   setTimeout(() => {
-    toast.classList.remove('visible')
-  }, 2000)
+    toast.classList.remove('active')
+  }, 2200)
 }
 
 export default async function initSidebarApp() {
@@ -26,127 +38,138 @@ export default async function initSidebarApp() {
   if (!root) return
 
   root.innerHTML = `
-    <div class="qs-container">
+    <div class="qs-shell">
+      <!-- Header -->
       <header class="qs-header">
         <div class="qs-brand">
-          <div class="qs-logo-icon">📸</div>
-          <div class="qs-brand-text">
-            <h1 class="qs-title">quick-screen</h1>
-            <p class="qs-subtitle">Chụp toàn trang & copy path cho AI</p>
+          <div class="qs-brand-icon">${ICONS.viewfinder}</div>
+          <div class="qs-brand-info">
+            <h1 class="qs-brand-title">quick-screen</h1>
+            <span class="qs-brand-tagline">AI Screen Capture Bridge</span>
           </div>
+        </div>
+        <div class="qs-status-pill">
+          <span class="qs-status-dot"></span>
+          <span>READY</span>
         </div>
       </header>
 
-      <!-- Action Panel -->
-      <section class="qs-actions">
-        <button id="btn-capture-single" class="qs-btn qs-btn-primary" type="button">
-          <span class="btn-icon">⚡</span>
-          <span class="btn-text">Chụp trang này (Full Page)</span>
+      <!-- Action Trigger Deck -->
+      <section class="qs-trigger-deck">
+        <button id="btn-capture-active" class="qs-btn qs-btn-primary" type="button">
+          ${ICONS.camera}
+          <span>Capture Active Tab (Full Page)</span>
         </button>
 
         <button id="btn-capture-batch" class="qs-btn qs-btn-secondary" type="button">
-          <span class="btn-icon">📑</span>
-          <span class="btn-text">Chụp tất cả các tab (Batch)</span>
+          ${ICONS.layers}
+          <span>Capture All Open Tabs (Batch)</span>
         </button>
 
-        <div id="capture-progress" class="qs-progress-box" style="display: none;">
-          <div class="qs-spinner"></div>
-          <div class="qs-progress-info">
-            <span id="progress-message">Đang chuẩn bị...</span>
-            <div class="qs-progress-bar">
-              <div id="progress-bar-fill" class="qs-progress-fill" style="width: 0%;"></div>
+        <!-- Progress Telemetry -->
+        <div id="telemetry-box" class="qs-telemetry-box" style="display: none;">
+          <div class="qs-loader"></div>
+          <div class="qs-telemetry-info">
+            <span id="telemetry-message">Initializing...</span>
+            <div class="qs-progress-track">
+              <div id="telemetry-bar-fill" class="qs-progress-fill" style="width: 0%;"></div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- History Header -->
-      <div class="qs-history-header">
-        <h2 class="qs-section-title">Lịch sử chụp <span id="history-count" class="qs-badge">0</span></h2>
-        <button id="btn-clear-history" class="qs-btn-text" type="button" title="Xóa toàn bộ lịch sử">
-          Xóa tất cả
+      <!-- History Controls -->
+      <div class="qs-section-bar">
+        <div class="qs-section-heading">
+          <span>Recent Captures</span>
+          <span id="feed-count" class="qs-counter">0</span>
+        </div>
+        <button id="btn-purge-history" class="qs-link-danger" type="button">
+          Clear history
         </button>
       </div>
 
-      <!-- History List -->
-      <div id="history-list" class="qs-history-list">
-        <div class="qs-empty-state">
-          <p class="empty-icon">🖼️</p>
-          <p class="empty-title">Chưa có ảnh chụp nào</p>
-          <p class="empty-desc">Bấm nút chụp bên trên để lưu ảnh và tự động copy đường dẫn cho AI</p>
+      <!-- Feed List -->
+      <div id="capture-feed" class="qs-feed">
+        <div class="qs-empty-feed">
+          <div class="qs-empty-icon">${ICONS.emptyFrame}</div>
+          <span class="qs-empty-label">No captures recorded</span>
+          <span class="qs-empty-hint">Trigger capture above to auto-save and copy path for AI</span>
         </div>
       </div>
 
-      <!-- In-sidebar feedback toast -->
-      <div id="sidebar-toast" class="qs-toast"></div>
+      <!-- Toast Feedback -->
+      <div id="qs-toast" class="qs-toast-overlay"></div>
     </div>
   `
 
-  const btnCaptureSingle = document.getElementById('btn-capture-single') as HTMLButtonElement
+  const btnCaptureActive = document.getElementById('btn-capture-active') as HTMLButtonElement
   const btnCaptureBatch = document.getElementById('btn-capture-batch') as HTMLButtonElement
-  const btnClearHistory = document.getElementById('btn-clear-history') as HTMLButtonElement
-  const progressBox = document.getElementById('capture-progress') as HTMLDivElement
-  const progressMsg = document.getElementById('progress-message') as HTMLSpanElement
-  const progressFill = document.getElementById('progress-bar-fill') as HTMLDivElement
-  const historyList = document.getElementById('history-list') as HTMLDivElement
-  const historyCount = document.getElementById('history-count') as HTMLSpanElement
+  const btnPurge = document.getElementById('btn-purge-history') as HTMLButtonElement
+  const telemetryBox = document.getElementById('telemetry-box') as HTMLDivElement
+  const telemetryMsg = document.getElementById('telemetry-message') as HTMLSpanElement
+  const telemetryBar = document.getElementById('telemetry-bar-fill') as HTMLDivElement
+  const feedContainer = document.getElementById('capture-feed') as HTMLDivElement
+  const feedCount = document.getElementById('feed-count') as HTMLSpanElement
 
-  async function renderHistory() {
+  async function renderFeed() {
     const items = await historyStore.list()
-    historyCount.textContent = String(items.length)
+    feedCount.textContent = String(items.length)
 
     if (items.length === 0) {
-      historyList.innerHTML = `
-        <div class="qs-empty-state">
-          <p class="empty-icon">🖼️</p>
-          <p class="empty-title">Chưa có ảnh chụp nào</p>
-          <p class="empty-desc">Bấm nút chụp bên trên để lưu ảnh và tự động copy đường dẫn cho AI</p>
+      feedContainer.innerHTML = `
+        <div class="qs-empty-feed">
+          <div class="qs-empty-icon">${ICONS.emptyFrame}</div>
+          <span class="qs-empty-label">No captures recorded</span>
+          <span class="qs-empty-hint">Trigger capture above to auto-save and copy path for AI</span>
         </div>
       `
       return
     }
 
-    historyList.innerHTML = items
+    feedContainer.innerHTML = items
       .map(
         (item: CaptureItem) => `
-        <div class="qs-card" data-id="${item.id}">
-          <div class="qs-card-thumb">
+        <article class="qs-item" data-id="${item.id}">
+          <div class="qs-item-thumb">
             <img src="${item.thumbnailDataUrl}" alt="${item.pageTitle}" loading="lazy" />
           </div>
-          <div class="qs-card-content">
-            <h3 class="qs-card-title" title="${item.pageTitle}">${item.pageTitle}</h3>
-            <div class="qs-card-time">${formatTime(item.timestamp)} &bull; ${item.width}x${item.height}px</div>
-            <div class="qs-card-path" title="${item.absolutePath}">${item.absolutePath}</div>
+          <div class="qs-item-body">
+            <h3 class="qs-item-title" title="${item.pageTitle}">${item.pageTitle}</h3>
+            <div class="qs-item-meta">${formatTimestamp(item.timestamp)} &bull; ${item.width}&times;${item.height}px</div>
+            <div class="qs-item-path" title="${item.absolutePath}">${item.absolutePath}</div>
             
-            <div class="qs-card-actions">
-              <button class="qs-action-btn qs-btn-copy-path" data-path="${item.absolutePath}" title="Copy đường dẫn">
-                📋 Copy Path
+            <div class="qs-item-toolbar">
+              <button class="qs-tool-btn qs-tool-btn-primary qs-action-copy-path" data-path="${item.absolutePath}" title="Copy absolute path">
+                ${ICONS.copy}
+                <span>Path</span>
               </button>
-              <button class="qs-action-btn qs-btn-copy-img" data-id="${item.id}" title="Copy ảnh">
-                🖼️ Copy Ảnh
+              <button class="qs-tool-btn qs-action-copy-image" data-id="${item.id}" title="Copy image data">
+                ${ICONS.image}
+                <span>Image</span>
               </button>
-              <button class="qs-action-btn qs-action-danger qs-btn-delete" data-id="${item.id}" title="Xóa khỏi lịch sử">
-                🗑️
+              <button class="qs-tool-btn qs-tool-btn-danger qs-action-delete" data-id="${item.id}" title="Remove entry">
+                ${ICONS.trash}
               </button>
             </div>
           </div>
-        </div>
+        </article>
       `
       )
       .join('')
 
-    // Bind card action buttons
-    historyList.querySelectorAll<HTMLButtonElement>('.qs-btn-copy-path').forEach((btn) => {
+    // Bind action listeners
+    feedContainer.querySelectorAll<HTMLButtonElement>('.qs-action-copy-path').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const path = btn.getAttribute('data-path')
         if (path) {
           await copyText(path)
-          showSidebarToast('✓ Đã copy đường dẫn vào clipboard!')
+          notify('Path copied to clipboard')
         }
       })
     })
 
-    historyList.querySelectorAll<HTMLButtonElement>('.qs-btn-copy-img').forEach((btn) => {
+    feedContainer.querySelectorAll<HTMLButtonElement>('.qs-action-copy-image').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id')
         const item = items.find((i) => i.id === id)
@@ -155,105 +178,104 @@ export default async function initSidebarApp() {
             const res = await fetch(item.thumbnailDataUrl)
             const blob = await res.blob()
             await copyDual(item.absolutePath, blob)
-            showSidebarToast('✓ Đã copy ảnh & path vào clipboard!')
-          } catch (err) {
-            console.error(err)
+            notify('Image & path copied')
+          } catch {
             await copyText(item.absolutePath)
-            showSidebarToast('✓ Đã copy đường dẫn!')
+            notify('Path copied')
           }
         }
       })
     })
 
-    historyList.querySelectorAll<HTMLButtonElement>('.qs-btn-delete').forEach((btn) => {
+    feedContainer.querySelectorAll<HTMLButtonElement>('.qs-action-delete').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id')
         if (id) {
           await historyStore.remove(id)
-          await renderHistory()
-          showSidebarToast('Đã xóa khỏi lịch sử')
+          await renderFeed()
+          notify('Removed from history')
         }
       })
     })
   }
 
-  // Handle single tab capture
-  btnCaptureSingle.addEventListener('click', async () => {
-    if (isCapturing) return
-    isCapturing = true
-    btnCaptureSingle.disabled = true
+  // Active Tab Capture
+  btnCaptureActive.addEventListener('click', async () => {
+    if (isBusy) return
+    isBusy = true
+    btnCaptureActive.disabled = true
     btnCaptureBatch.disabled = true
-    progressBox.style.display = 'flex'
-    progressFill.style.width = '10%'
-    progressMsg.textContent = 'Đang chuẩn bị...'
+    telemetryBox.style.display = 'flex'
+    telemetryBar.style.width = '10%'
+    telemetryMsg.textContent = 'Measuring viewport...'
 
     try {
       await captureEngine.captureActive((p) => {
-        progressMsg.textContent = p.message || 'Đang chụp...'
+        telemetryMsg.textContent = p.message || 'Capturing...'
         const percent = Math.round((p.currentSlice / Math.max(1, p.totalSlices)) * 100)
-        progressFill.style.width = `${percent}%`
+        telemetryBar.style.width = `${percent}%`
       })
 
-      showSidebarToast('✓ Đã chụp & copy path thành công!')
-      await renderHistory()
+      notify('Capture complete & path copied')
+      await renderFeed()
     } catch (err: any) {
       console.error('Capture error:', err)
-      showSidebarToast(`Lỗi: ${err?.message || 'Không thể chụp trang'}`)
+      notify(`Error: ${err?.message || 'Capture failed'}`)
     } finally {
-      isCapturing = false
-      btnCaptureSingle.disabled = false
+      isBusy = false
+      btnCaptureActive.disabled = false
       btnCaptureBatch.disabled = false
       setTimeout(() => {
-        progressBox.style.display = 'none'
-        progressFill.style.width = '0%'
-      }, 800)
+        telemetryBox.style.display = 'none'
+        telemetryBar.style.width = '0%'
+      }, 700)
     }
   })
 
-  // Handle batch tab capture
+  // Batch Tabs Capture
   btnCaptureBatch.addEventListener('click', async () => {
-    if (isCapturing) return
-    isCapturing = true
-    btnCaptureSingle.disabled = true
+    if (isBusy) return
+    isBusy = true
+    btnCaptureActive.disabled = true
     btnCaptureBatch.disabled = true
-    progressBox.style.display = 'flex'
-    progressFill.style.width = '5%'
-    progressMsg.textContent = 'Đang quét danh sách các tab...'
+    telemetryBox.style.display = 'flex'
+    telemetryBar.style.width = '5%'
+    telemetryMsg.textContent = 'Indexing open tabs...'
 
     try {
       const result = await captureEngine.captureBatch((msg, current, total) => {
-        progressMsg.textContent = msg
+        telemetryMsg.textContent = msg
         const percent = Math.round((current / Math.max(1, total)) * 100)
-        progressFill.style.width = `${percent}%`
+        telemetryBar.style.width = `${percent}%`
       })
 
-      showSidebarToast(`✓ Đã chụp ${result.items.length} tab & copy toàn bộ path!`)
-      await renderHistory()
+      notify(`Captured ${result.items.length} tabs & paths copied`)
+      await renderFeed()
     } catch (err: any) {
-      console.error('Batch capture error:', err)
-      showSidebarToast(`Lỗi: ${err?.message || 'Lỗi chụp hàng loạt'}`)
+      console.error('Batch error:', err)
+      notify(`Error: ${err?.message || 'Batch capture failed'}`)
     } finally {
-      isCapturing = false
-      btnCaptureSingle.disabled = false
+      isBusy = false
+      btnCaptureActive.disabled = false
       btnCaptureBatch.disabled = false
       setTimeout(() => {
-        progressBox.style.display = 'none'
-        progressFill.style.width = '0%'
-      }, 800)
+        telemetryBox.style.display = 'none'
+        telemetryBar.style.width = '0%'
+      }, 700)
     }
   })
 
-  // Clear history
-  btnClearHistory.addEventListener('click', async () => {
-    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong danh sách không?')) {
+  // Purge History
+  btnPurge.addEventListener('click', async () => {
+    if (confirm('Clear all recorded captures from history?')) {
       await historyStore.clear()
-      await renderHistory()
-      showSidebarToast('Đã dọn sạch lịch sử')
+      await renderFeed()
+      notify('History cleared')
     }
   })
 
-  // Initial load
-  await renderHistory()
+  // Initial render
+  await renderFeed()
 }
 
 initSidebarApp()

@@ -206,7 +206,7 @@ export class CaptureEngine {
     try {
       await chrome.tabs.sendMessage(tab.id, {
         type: 'SHOW_TOAST',
-        message: '✓ Đã chụp & copy path vào clipboard!',
+        message: 'Đã chụp & copy path vào clipboard!',
         filePath: absolutePath
       })
     } catch {}
@@ -305,7 +305,7 @@ export class CaptureEngine {
       try {
         await chrome.tabs.sendMessage(initialActiveTabId, {
           type: 'SHOW_TOAST',
-          message: `✓ Đã chụp ${capturedItems.length} tabs & copy toàn bộ path!`,
+          message: `Đã chụp ${capturedItems.length} tabs & copy toàn bộ path!`,
           filePath: `${capturedItems.length} đường dẫn đã nạp vào clipboard`
         })
       } catch {}
