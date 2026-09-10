@@ -19,21 +19,27 @@ Browser extension for full-page screenshots. Saves captures directly to local te
 
 ## Quick Setup
 
-Clone the repository, install the native host, and build the extension in a single command:
+Clone the repository, install the native host, and build the extension:
 
 ### Linux
 
 ```bash
-git clone https://github.com/HaoNgo232/quick-shot.git && cd quick-shot && ./install-native-host.sh && bun install && bun run build
+git clone https://github.com/HaoNgo232/quick-shot.git
+cd quick-shot
+./install-native-host.sh
+bun install
+bun run build
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/HaoNgo232/quick-shot.git; cd quick-shot; powershell -ExecutionPolicy Bypass -File .\install-native-host.ps1; bun install; bun run build
+git clone https://github.com/HaoNgo232/quick-shot.git
+cd quick-shot
+powershell -ExecutionPolicy Bypass -File .\install-native-host.ps1
+bun install
+bun run build
 ```
-
-*(See [docs/native-host-windows.md](docs/native-host-windows.md) for Windows configuration details and troubleshooting.)*
 
 ### Load Extension into Browser
 
