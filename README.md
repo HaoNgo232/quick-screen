@@ -1,51 +1,72 @@
-# quick-screen 📸
+# quick-screen
 
-> Browser Extension chụp toàn bộ trang web (Full Page), tự động lưu file vào `/tmp/quick-screen/` và nạp đường dẫn tuyệt đối (kèm dữ liệu ảnh) vào Clipboard để gửi ngay cho AI.
+Browser extension for full-page screenshots. Saves captures directly to local temporary storage without download dialogs and writes both the file path and image data to the clipboard.
 
-## Tính năng nổi bật
+## Features
 
-- ⚡ **Chụp Full Page (1-Click)**: Cuộn và ghép toàn bộ trang từ đầu đến chân trang bằng Canvas thông minh, tự động ẩn menu fixed/sticky không bị lặp.
-- 🚀 **Zero-Prompt Auto Save (/tmp)**: Sử dụng Native Messaging Host ghi thẳng file vào `/tmp/quick-screen/`, **hoàn toàn tự động 100% không bao giờ hiện hộp thoại hỏi lưu**, bất kể cài đặt download của Chrome như thế nào.
-- 📑 **Chụp hàng loạt Tab (Batch)**: Lần lượt chụp tất cả các tab đang mở trong cửa sổ và copy toàn bộ danh sách đường dẫn file (mỗi tab một dòng) vào clipboard.
-- 📋 **Dual Clipboard**: Nạp đồng thời cả đường dẫn tuyệt đối (`text/plain`) và binary image (`image/png`). Dán vào terminal AI thì ra path, dán vào web ChatGPT/Claude thì ra ảnh.
-- 📐 **Adaptive Scaling**: Tự động scale tỷ lệ nếu trang web quá dài vượt ngưỡng an toàn Canvas (16,000px), đảm bảo không crash trình duyệt.
-- 🖼️ **Side Panel & Lịch sử**: Giao diện sidebar hiển thị danh sách ảnh vừa chụp, preview thumbnail, nút copy path và copy image tiện lợi.
-- 🍞 **Toast Banner trực quan**: Thông báo xác nhận nhẹ nhàng trên trang web khi chụp và copy thành công.
+- **Full-Page Capture**: Scrolls and stitches the DOM into a canvas image while hiding fixed and sticky elements to avoid duplicate headers.
+- **Direct Local Storage**: Writes files to `/tmp/quick-screen/` (Linux) or `%TEMP%\quick-screen\` (Windows) via a Native Messaging host.
+- **Dual Clipboard**: Sets both the file path (`text/plain`) and binary image (`image/png`) on the system clipboard.
+- **Batch Capture**: Captures all tabs in the active window sequentially and returns line-delimited file paths.
+- **Canvas Clamping**: Scales down pages exceeding the 16,384 px canvas height limit.
+- **Side Panel & History**: Displays recent captures, thumbnails, and a full-resolution viewer.
 
-## Cài đặt & Sử dụng
+## Requirements
 
-### 1. Kích hoạt Native Host (để lưu tự động không hiện popup)
-Chạy script cài đặt 1 lần duy nhất trên máy:
+- [Bun](https://bun.sh) (>= 1.1)
+- Python 3
+- Chromium-based browser (Chrome, Chromium, Brave, Edge)
 
-- **Linux**:
-  ```bash
-  ./install-native-host.sh
-  ```
-- **Windows**:
-  Chạy file script bằng Command Prompt hoặc PowerShell:
-  ```cmd
-  install-native-host.bat
-  ```
-  *(hoặc trong PowerShell: `powershell -ExecutionPolicy Bypass -File .\install-native-host.ps1`)*
+## Quick Setup
 
-### 2. Build extension
+Clone the repository, install the native host, and build the extension in a single command:
+
+### Linux
+
 ```bash
-npm run build
+git clone https://github.com/HaoNgo232/quick-screen.git && cd quick-screen && ./install-native-host.sh && bun install && bun run build
 ```
 
-### 3. Cập nhật / Tải vào Chrome
-1. Mở `chrome://extensions/`
-2. Bấm nút **Reload** (icon mũi tên xoay tròn) ở extension **quick-screen** (hoặc chọn *Load unpacked* trỏ vào `dist/chromium`).
+### Windows (PowerShell)
 
-### 4. Sử dụng
-- Bấm vào icon **quick-screen** trên thanh công cụ để mở **Side Panel**.
-- Bấm **"⚡ Chụp trang này (Full Page)"** hoặc **"📑 Chụp tất cả các tab (Batch)"**.
-- Ảnh tự động lưu vào `/tmp/quick-screen/...` và đường dẫn đã có sẵn trong clipboard, dán ngay vào AI!
+```powershell
+git clone https://github.com/HaoNgo232/quick-screen.git; cd quick-screen; powershell -ExecutionPolicy Bypass -File .\install-native-host.ps1; bun install; bun run build
+```
 
-## Tài liệu kiến trúc & Vận hành
-- [Thuật ngữ miền (CONTEXT.md)](./CONTEXT.md)
-- [Hướng dẫn Native Host trên Windows](./docs/native-host-windows.md)
-- [ADR 0001: Scroll & Stitch Capture](./docs/adr/0001-scroll-and-stitch-capture.md)
-- [ADR 0002: Download API for Local Artifacts](./docs/adr/0002-download-api-for-local-artifacts.md)
-- [ADR 0003: Native Messaging Host for /tmp](./docs/adr/0003-native-messaging-for-tmp-storage.md)
-- [ADR 0004: Windows Support for Native Messaging Host](./docs/adr/0004-windows-native-messaging-host.md)
+*(See [docs/native-host-windows.md](docs/native-host-windows.md) for Windows configuration details and troubleshooting.)*
+
+### Load Extension into Browser
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked** and select `dist/chromium`
+
+## Usage
+
+1. Open the **Side Panel** via the quick-screen extension icon.
+2. Select **Capture Active Tab** or **Capture All Tabs**.
+3. Use the output:
+   - File paths are copied as plain text (e.g. `/tmp/quick-screen/capture-*.png`).
+   - Image data is copied to the clipboard for pasting into graphic tools or web inputs.
+
+## Development
+
+```bash
+# Typecheck
+bun run check
+
+# Unit tests
+bun test
+
+# Build
+bun run build
+```
+
+## Uninstall Native Host
+
+- **Linux**: `./uninstall-native-host.sh`
+- **Windows**: `uninstall-native-host.bat`
+
+## License
+
+[MIT](LICENSE)
