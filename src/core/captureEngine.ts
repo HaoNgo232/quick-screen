@@ -135,7 +135,7 @@ export interface CaptureTabOptions {
  */
 export class CaptureEngine {
   constructor(
-    public sink: ArtifactSink = new AutoSink(),
+    private sink: ArtifactSink = new AutoSink(),
     private history: HistoryStore = historyStore
   ) {}
 
@@ -637,6 +637,16 @@ export class CaptureEngine {
     }
 
     return new Blob(chunks, { type: 'image/png' })
+  }
+
+  /**
+   * Diagnostic probe checking artifact sink connectivity and storage path.
+   */
+  async checkHealth() {
+    if (this.sink.checkHealth) {
+      return this.sink.checkHealth()
+    }
+    return { mode: 'download' as const, directory: 'Downloads/quick-shot', healthy: true }
   }
 }
 

@@ -584,10 +584,10 @@ body.qs-mode-sidebar {
   flex: 1;
 }
 
-@media (min-width: 540px) {
+@media (min-width: 520px) {
   body.qs-mode-sidebar .qs-feed {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
     align-items: start;
   }
@@ -597,9 +597,9 @@ body.qs-mode-sidebar {
   }
 }
 
-@media (min-width: 880px) {
+@media (min-width: 820px) {
   body.qs-mode-sidebar .qs-feed {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 14px;
   }
 }

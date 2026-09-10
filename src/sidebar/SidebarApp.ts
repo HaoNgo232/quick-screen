@@ -72,7 +72,7 @@ export default async function initSidebarApp() {
           }
           <div id="sink-status-pill" class="qs-status-pill" title="Checking host status...">
             <span class="qs-status-dot"></span>
-            <span id="sink-status-text">READY</span>
+            <span id="sink-status-text">CHECKING...</span>
           </div>
         </div>
       </header>
@@ -197,8 +197,8 @@ export default async function initSidebarApp() {
     let mode: 'native' | 'download' = 'download'
 
     try {
-      if (captureEngine.sink.checkHealth) {
-        const health = await captureEngine.sink.checkHealth()
+      if (typeof captureEngine.checkHealth === 'function') {
+        const health = await captureEngine.checkHealth()
         healthy = health.healthy === true
         mode = health.mode
       }

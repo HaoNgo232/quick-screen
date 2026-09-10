@@ -14,6 +14,10 @@ const ICONS = {
   plus: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`
 }
 
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 3.0
+const ZOOM_STEP = 0.2
+
 function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -183,29 +187,29 @@ export async function initViewerApp() {
         btn100.classList.remove('active')
       }
 
-      btnZoomOut.disabled = currentScale <= 0.25 + 0.001
-      btnZoomIn.disabled = currentScale >= 3.0 - 0.001
+      btnZoomOut.disabled = currentScale <= MIN_ZOOM + 0.001
+      btnZoomIn.disabled = currentScale >= MAX_ZOOM - 0.001
     }
   }
 
   function zoomIn() {
     const base = isFitWidth ? getBaseScale() : currentScale
-    let next = Math.round((base + 0.2) * 10) / 10
-    if (base <= 0.25) {
-      next = 0.4
+    let next = Math.round((base + ZOOM_STEP) * 10) / 10
+    if (base <= MIN_ZOOM) {
+      next = MIN_ZOOM + ZOOM_STEP
     }
-    currentScale = Math.min(3.0, Math.max(0.25, next))
+    currentScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next))
     isFitWidth = false
     applyZoom()
   }
 
   function zoomOut() {
     const base = isFitWidth ? getBaseScale() : currentScale
-    let next = Math.round((base - 0.2) * 10) / 10
-    if (next < 0.25) {
-      next = 0.25
+    let next = Math.round((base - ZOOM_STEP) * 10) / 10
+    if (next < MIN_ZOOM) {
+      next = MIN_ZOOM
     }
-    currentScale = Math.max(0.25, Math.min(3.0, next))
+    currentScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next))
     isFitWidth = false
     applyZoom()
   }

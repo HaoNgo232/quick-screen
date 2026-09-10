@@ -15,6 +15,8 @@ export interface ArtifactSink {
   checkHealth?(): Promise<SinkHealth>
 }
 
+export const NATIVE_HOST_NAME = 'com.quickscreen.host'
+
 /**
  * Adapter 1: NativeHostSink
  * Saves directly to /tmp/quick-shot/ with zero prompts via native messaging host.
@@ -24,7 +26,7 @@ export class NativeHostSink implements ArtifactSink {
     return new Promise((resolve, reject) => {
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           { action: 'save', filename, base64Data: dataUrl, copyClipboard },
           (response) => {
             if (chrome.runtime.lastError || !response || response.status !== 'ok') {
@@ -44,7 +46,7 @@ export class NativeHostSink implements ArtifactSink {
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           { action: 'copy_text', text },
           (response) => {
             resolve(response?.status === 'ok')
@@ -60,7 +62,7 @@ export class NativeHostSink implements ArtifactSink {
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           { action: 'copy_image', filepath },
           (response) => {
             resolve(response?.status === 'ok')
@@ -76,7 +78,7 @@ export class NativeHostSink implements ArtifactSink {
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           { action: 'read_file', filepath },
           (response) => {
             if (!chrome.runtime.lastError && response?.status === 'ok' && response.dataUrl) {
@@ -96,7 +98,7 @@ export class NativeHostSink implements ArtifactSink {
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           { action: 'read_file_chunk', filepath, offset, chunkSize },
           (response) => {
             if (!chrome.runtime.lastError && response?.status === 'ok' && response.data) {
@@ -116,7 +118,7 @@ export class NativeHostSink implements ArtifactSink {
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           { action: 'open_file', filepath },
           (response) => {
             resolve(response?.status === 'ok')
@@ -132,7 +134,7 @@ export class NativeHostSink implements ArtifactSink {
     return new Promise((resolve, reject) => {
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           {
             action: 'save_batch',
             items: items.map((i) => ({ filename: i.filename, base64Data: i.dataUrl }))
@@ -163,7 +165,7 @@ export class NativeHostSink implements ArtifactSink {
 
       try {
         chrome.runtime.sendNativeMessage(
-          'com.quickscreen.host',
+          NATIVE_HOST_NAME,
           { action: 'ping' },
           (response) => {
             if (settled) return

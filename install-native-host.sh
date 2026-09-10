@@ -4,7 +4,7 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_PATH="$HOME/.local/bin/quick-shot-host"
 
-echo "==> Cài đặt script quick-shot-host vào $BIN_PATH"
+echo "==> Installing quick-shot-host script to $BIN_PATH"
 mkdir -p "$HOME/.local/bin"
 
 cp "$DIR/native-host/quick_screen_host.py" "$BIN_PATH"
@@ -44,7 +44,7 @@ for id in "${DETECTED_IDS[@]}"; do
     \"chrome-extension://$id/\""
 done
 
-echo "==> Đăng ký NativeMessagingHosts cho các trình duyệt Chromium/Chrome/Brave..."
+echo "==> Registering NativeMessagingHosts for Chromium/Chrome/Brave browsers..."
 for config_dir in "$HOME/.config/google-chrome" "$HOME/.config/chromium" "$HOME/.config/BraveSoftware/Brave-Browser"; do
   if [ -d "$config_dir" ] || [ "$config_dir" = "$HOME/.config/google-chrome" ]; then
     mkdir -p "$config_dir/NativeMessagingHosts"
@@ -59,8 +59,8 @@ $ALLOWED_ORIGINS_JSON
   ]
 }
 JSON_EOF
-    echo "    ✓ Đã tạo $config_dir/NativeMessagingHosts/com.quickscreen.host.json"
+    echo "    [OK] Created $config_dir/NativeMessagingHosts/com.quickscreen.host.json"
   fi
 done
 
-echo "==> Hoàn tất! Native host đã sẵn sàng."
+echo "==> Done! Native host is ready."

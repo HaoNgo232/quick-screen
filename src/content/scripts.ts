@@ -14,7 +14,7 @@ function findFixedElements(): HTMLElement[] {
     if (!el || !(el instanceof HTMLElement)) continue
     
     // Ignore our own toast root if present
-    if (el.hasAttribute('data-quickscreen-toast')) continue
+    if (el.hasAttribute('data-quickshot-toast')) continue
 
     const style = window.getComputedStyle(el)
     if (style.position === 'fixed' || style.position === 'sticky') {
@@ -25,14 +25,14 @@ function findFixedElements(): HTMLElement[] {
 }
 
 function showToast(message?: string, filePath?: string) {
-  const existingToast = document.getElementById('quickscreen-toast-container')
+  const existingToast = document.getElementById('quickshot-toast-container')
   if (existingToast) {
     existingToast.remove()
   }
 
   const toastContainer = document.createElement('div')
-  toastContainer.id = 'quickscreen-toast-container'
-  toastContainer.setAttribute('data-quickscreen-toast', 'true')
+  toastContainer.id = 'quickshot-toast-container'
+  toastContainer.setAttribute('data-quickshot-toast', 'true')
   toastContainer.style.cssText = `
     position: fixed !important;
     top: 24px !important;
