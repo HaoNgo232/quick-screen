@@ -77,6 +77,12 @@ export default async function initSidebarApp() {
 
       <!-- Sink Transparency Dropdown Popover -->
       <div id="sink-popover" class="qs-popover" style="display: none;">
+        <div class="qs-popover-header">
+          <span class="qs-popover-title">Storage Setup</span>
+          <button id="btn-close-popover" class="qs-popover-close" type="button" title="Close instructions">
+            ${ICONS.close}
+          </button>
+        </div>
         <p class="qs-popover-text">Native host is not active. Captures are saved to <code>~/Downloads/quick-shot/</code>.</p>
         <p class="qs-popover-hint">To enable fast direct /tmp saving and OS clipboard, run in your terminal:</p>
         <div class="qs-code-snippet">
@@ -84,6 +90,11 @@ export default async function initSidebarApp() {
           <button id="btn-copy-install-cmd" class="qs-btn-copy-cmd" type="button">
             ${ICONS.copy}
             <span>Copy Command</span>
+          </button>
+        </div>
+        <div class="qs-popover-actions">
+          <button id="btn-refresh-health" class="qs-btn-refresh-health" type="button">
+            <span>Recheck Connection</span>
           </button>
         </div>
       </div>
@@ -173,6 +184,9 @@ export default async function initSidebarApp() {
   const btnConfirmCancel = document.getElementById('btn-confirm-cancel') as HTMLButtonElement
   const btnConfirmClear = document.getElementById('btn-confirm-clear') as HTMLButtonElement
 
+  const btnClosePopover = document.getElementById('btn-close-popover') as HTMLButtonElement | null
+  const btnRefreshHealth = document.getElementById('btn-refresh-health') as HTMLButtonElement | null
+
   // Sink Health & Transparency
   async function updateSinkStatus() {
     if (!sinkPill || !sinkStatusText) return
@@ -205,10 +219,51 @@ export default async function initSidebarApp() {
     }
   }
 
-  sinkPill?.addEventListener('click', () => {
+  sinkPill?.addEventListener('click', (e) => {
+    e.stopPropagation()
     if (sinkPill.classList.contains('is-fallback') && sinkPopover) {
       const isVisible = sinkPopover.style.display === 'flex'
       sinkPopover.style.display = isVisible ? 'none' : 'flex'
+    }
+  })
+
+  btnClosePopover?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (sinkPopover) sinkPopover.style.display = 'none'
+  })
+
+  btnRefreshHealth?.addEventListener('click', async (e) => {
+    e.stopPropagation()
+    if (btnRefreshHealth) {
+      btnRefreshHealth.disabled = true
+      btnRefreshHealth.textContent = 'Checking...'
+    }
+    await updateSinkStatus()
+    if (btnRefreshHealth) {
+      btnRefreshHealth.disabled = false
+      btnRefreshHealth.textContent = 'Recheck Connection'
+    }
+    if (sinkPill?.classList.contains('is-active')) {
+      notify('Native host connected!')
+    }
+  })
+
+  // Dismiss popover on click outside or Escape
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null
+    if (
+      sinkPopover &&
+      sinkPopover.style.display === 'flex' &&
+      !sinkPopover.contains(target) &&
+      !sinkPill?.contains(target)
+    ) {
+      sinkPopover.style.display = 'none'
+    }
+  })
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sinkPopover && sinkPopover.style.display === 'flex') {
+      sinkPopover.style.display = 'none'
     }
   })
 
