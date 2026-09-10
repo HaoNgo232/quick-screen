@@ -48,6 +48,8 @@ export default async function initSidebarApp() {
   if (!root) return
 
   const isSidebar = window.location.pathname.includes('sidebar')
+  document.body.classList.toggle('qs-mode-sidebar', isSidebar)
+  document.body.classList.toggle('qs-mode-popup', !isSidebar)
 
   root.innerHTML = `
     <div class="qs-shell">

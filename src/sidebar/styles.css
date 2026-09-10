@@ -29,9 +29,18 @@ body {
   user-select: none;
   overflow-x: hidden;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  width: 380px;
-  min-width: 340px;
+  min-width: 320px;
   min-height: 520px;
+}
+
+body.qs-mode-popup {
+  width: 380px;
+  max-width: 380px;
+}
+
+body.qs-mode-sidebar {
+  width: 100%;
+  max-width: 100%;
 }
 
 .qs-shell {
@@ -40,6 +49,10 @@ body {
   flex-direction: column;
   gap: 16px;
   min-height: 100vh;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 /* Header & Identity */
@@ -307,6 +320,19 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
+}
+
+@media (min-width: 540px) {
+  body.qs-mode-sidebar .qs-trigger-deck {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  body.qs-mode-sidebar .qs-telemetry-box {
+    grid-column: 1 / -1;
+  }
 }
 
 .qs-btn {
@@ -558,6 +584,26 @@ body {
   flex: 1;
 }
 
+@media (min-width: 540px) {
+  body.qs-mode-sidebar .qs-feed {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+
+  body.qs-mode-sidebar .qs-empty-feed {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 880px) {
+  body.qs-mode-sidebar .qs-feed {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+  }
+}
+
 /* Empty State */
 .qs-empty-feed {
   display: flex;
@@ -606,6 +652,7 @@ body {
   border-radius: 8px;
   padding: 10px;
   transition: border-color 0.12s ease;
+  min-width: 0;
 }
 
 .qs-item:hover {
@@ -624,6 +671,13 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
+}
+
+@media (min-width: 540px) {
+  .qs-item-thumb {
+    width: 66px;
+    height: 82px;
+  }
 }
 
 .qs-item-thumb img {
