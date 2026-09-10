@@ -24,7 +24,7 @@ function findFixedElements(): HTMLElement[] {
   return elements
 }
 
-function showToast(message: string, filePath?: string) {
+function showToast(message?: string, filePath?: string) {
   const existingToast = document.getElementById('quickscreen-toast-container')
   if (existingToast) {
     existingToast.remove()
@@ -35,16 +35,18 @@ function showToast(message: string, filePath?: string) {
   toastContainer.setAttribute('data-quickscreen-toast', 'true')
   toastContainer.style.cssText = `
     position: fixed !important;
-    bottom: 30px !important;
-    left: 50% !important;
-    transform: translateX(-50%) translateY(20px) !important;
+    top: 24px !important;
+    right: 24px !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: translateX(20px) !important;
     background: rgba(24, 24, 27, 0.95) !important;
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
     border: 1px solid rgba(52, 211, 153, 0.4) !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3), 0 0 20px rgba(52, 211, 153, 0.2) !important;
     border-radius: 12px !important;
-    padding: 12px 20px !important;
+    padding: 12px 18px !important;
     z-index: 2147483647 !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     color: #ffffff !important;
@@ -52,7 +54,7 @@ function showToast(message: string, filePath?: string) {
     align-items: center !important;
     gap: 12px !important;
     max-width: 90vw !important;
-    cursor: pointer !important;
+    cursor: ${filePath ? 'pointer' : 'default'} !important;
     opacity: 0 !important;
     transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     pointer-events: auto !important;
@@ -89,7 +91,7 @@ function showToast(message: string, filePath?: string) {
     color: #f4f4f5 !important;
     white-space: nowrap !important;
   `
-  title.textContent = message
+  title.textContent = message || 'Screenshot captured & path copied!'
 
   content.appendChild(title)
 
@@ -108,37 +110,85 @@ function showToast(message: string, filePath?: string) {
     content.appendChild(pathSnippet)
   }
 
+  const closeBtn = document.createElement('button')
+  closeBtn.setAttribute('type', 'button')
+  closeBtn.setAttribute('aria-label', 'Close')
+  closeBtn.style.cssText = `
+    background: transparent !important;
+    border: none !important;
+    color: #a1a1aa !important;
+    cursor: pointer !important;
+    padding: 4px !important;
+    margin-left: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    outline: none !important;
+    flex-shrink: 0 !important;
+    transition: color 0.15s ease, background-color 0.15s ease !important;
+  `
+  closeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+
+  closeBtn.addEventListener('mouseenter', () => {
+    closeBtn.style.color = '#ffffff'
+    closeBtn.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
+  })
+  closeBtn.addEventListener('mouseleave', () => {
+    closeBtn.style.color = '#a1a1aa'
+    closeBtn.style.backgroundColor = 'transparent'
+  })
+
+  let isDismissed = false
+  let dismissTimer: ReturnType<typeof setTimeout> | null = null
+
+  const dismissToast = () => {
+    if (isDismissed) return
+    isDismissed = true
+    if (dismissTimer) {
+      clearTimeout(dismissTimer)
+      dismissTimer = null
+    }
+    toastContainer.style.opacity = '0'
+    toastContainer.style.transform = 'translateX(20px)'
+    setTimeout(() => {
+      if (toastContainer.parentNode) {
+        toastContainer.remove()
+      }
+    }, 250)
+  }
+
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    dismissToast()
+  })
+
   toastContainer.appendChild(icon)
   toastContainer.appendChild(content)
+  toastContainer.appendChild(closeBtn)
   document.body.appendChild(toastContainer)
 
   // Trigger smooth slide in
   requestAnimationFrame(() => {
     toastContainer.style.opacity = '1'
-    toastContainer.style.transform = 'translateX(-50%) translateY(0)'
+    toastContainer.style.transform = 'translateX(0)'
   })
 
   if (filePath) {
-    toastContainer.title = 'Click để copy lại đường dẫn'
+    toastContainer.title = 'Click to re-copy path'
     toastContainer.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(filePath)
-        title.textContent = '✓ Đã copy lại đường dẫn!'
+        title.textContent = 'Path re-copied!'
       } catch (err) {
         console.error('Re-copy error:', err)
       }
     })
   }
 
-  setTimeout(() => {
-    toastContainer.style.opacity = '0'
-    toastContainer.style.transform = 'translateX(-50%) translateY(10px)'
-    setTimeout(() => {
-      if (toastContainer.parentNode) {
-        toastContainer.remove()
-      }
-    }, 300)
-  }, 2500)
+  dismissTimer = setTimeout(() => {
+    dismissToast()
+  }, 3500)
 }
 
 /**

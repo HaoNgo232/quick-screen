@@ -9,7 +9,9 @@ const ICONS = {
   close: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
   check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   zoom: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`,
-  external: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`
+  external: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
+  minus: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  plus: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`
 }
 
 function formatTimestamp(timestamp: number): string {
@@ -49,9 +51,9 @@ export async function initViewerApp() {
   }
 
   const items = await historyStore.list()
-  const item = items.find((i: CaptureItem) => i.id === id)
+  const foundItem = items.find((i: CaptureItem) => i.id === id)
 
-  if (!item) {
+  if (!foundItem) {
     root.innerHTML = `
       <div class="qs-viewer-empty">
         <span>Screenshot not found in recent captures</span>
@@ -59,6 +61,8 @@ export async function initViewerApp() {
     `
     return
   }
+
+  const item: CaptureItem = foundItem
 
   document.title = `${item.pageTitle} - quick-screen Viewer`
 
@@ -79,11 +83,22 @@ export async function initViewerApp() {
         </div>
       </div>
       <div class="qs-viewer-actions">
-        <button id="viewer-btn-zoom" class="qs-btn" title="Toggle between Fit Width and 100% Actual Size">
-          ${ICONS.zoom}
-          <span id="viewer-zoom-label">Actual Size (100%)</span>
-        </button>
-        <button id="viewer-btn-open-os" class="qs-btn" title="Open with OS image viewer (Xviewer/Pix)">
+        <div class="qs-btn-group qs-zoom-group">
+          <button id="viewer-btn-zoom-out" class="qs-btn qs-btn-icon" title="Zoom Out (-)">
+            ${ICONS.minus}
+          </button>
+          <span id="viewer-zoom-indicator" class="qs-zoom-indicator" title="Current zoom level">Fit</span>
+          <button id="viewer-btn-zoom-in" class="qs-btn qs-btn-icon" title="Zoom In (+)">
+            ${ICONS.plus}
+          </button>
+          <button id="viewer-btn-fit" class="qs-btn active" title="Fit Width (W)">
+            <span>Fit Width</span>
+          </button>
+          <button id="viewer-btn-100" class="qs-btn" title="Actual Size 100% (0)">
+            <span>100%</span>
+          </button>
+        </div>
+        <button id="viewer-btn-open-os" class="qs-btn" title="Open with OS image viewer">
           ${ICONS.external}
           <span>Open in App</span>
         </button>
@@ -109,8 +124,11 @@ export async function initViewerApp() {
     </main>
   `
 
-  const btnZoom = document.getElementById('viewer-btn-zoom') as HTMLButtonElement
-  const zoomLabel = document.getElementById('viewer-zoom-label') as HTMLSpanElement
+  const btnZoomOut = document.getElementById('viewer-btn-zoom-out') as HTMLButtonElement
+  const zoomIndicator = document.getElementById('viewer-zoom-indicator') as HTMLSpanElement
+  const btnZoomIn = document.getElementById('viewer-btn-zoom-in') as HTMLButtonElement
+  const btnFit = document.getElementById('viewer-btn-fit') as HTMLButtonElement
+  const btn100 = document.getElementById('viewer-btn-100') as HTMLButtonElement
   const btnOpenOs = document.getElementById('viewer-btn-open-os') as HTMLButtonElement
   const btnCopyPath = document.getElementById('viewer-btn-copy-path') as HTMLButtonElement
   const btnClose = document.getElementById('viewer-btn-close') as HTMLButtonElement
@@ -118,18 +136,95 @@ export async function initViewerApp() {
   const imgWrap = document.getElementById('viewer-img-wrap') as HTMLDivElement
   const imgEl = document.getElementById('viewer-img') as HTMLImageElement
 
-  let isActualSize = false
+  let isFitWidth = true
+  let currentScale = 1.0
 
-  btnZoom.addEventListener('click', () => {
-    isActualSize = !isActualSize
-    if (isActualSize) {
-      imgWrap.classList.add('actual-size')
-      zoomLabel.textContent = 'Fit Width'
+  function getBaseScale(): number {
+    if (!isFitWidth) return currentScale
+    const naturalWidth = imgEl.naturalWidth || item.width || 1
+    const renderedWidth = imgEl.clientWidth || naturalWidth
+    return Math.round((renderedWidth / naturalWidth) * 10) / 10
+  }
+
+  function applyZoom() {
+    if (isFitWidth) {
+      imgWrap.classList.add('fit-width')
+      imgWrap.classList.remove('custom-scale')
+      imgWrap.style.width = '100%'
+      imgWrap.style.maxWidth = '100%'
+      imgEl.style.width = '100%'
+      imgEl.style.maxWidth = '100%'
+      imgEl.style.height = 'auto'
+
+      zoomIndicator.textContent = 'Fit'
+      btnFit.classList.add('active')
+      btn100.classList.remove('active')
+      btnZoomOut.disabled = false
+      btnZoomIn.disabled = false
     } else {
-      imgWrap.classList.remove('actual-size')
-      zoomLabel.textContent = 'Actual Size (100%)'
+      imgWrap.classList.remove('fit-width')
+      imgWrap.classList.add('custom-scale')
+
+      const naturalWidth = imgEl.naturalWidth || item.width || 1200
+      const targetWidth = Math.round(naturalWidth * currentScale)
+
+      imgWrap.style.width = `${targetWidth}px`
+      imgWrap.style.maxWidth = 'none'
+      imgEl.style.width = `${targetWidth}px`
+      imgEl.style.maxWidth = 'none'
+      imgEl.style.height = 'auto'
+
+      zoomIndicator.textContent = `${Math.round(currentScale * 100)}%`
+      btnFit.classList.remove('active')
+
+      if (Math.abs(currentScale - 1.0) < 0.01) {
+        btn100.classList.add('active')
+      } else {
+        btn100.classList.remove('active')
+      }
+
+      btnZoomOut.disabled = currentScale <= 0.25 + 0.001
+      btnZoomIn.disabled = currentScale >= 3.0 - 0.001
     }
-  })
+  }
+
+  function zoomIn() {
+    const base = isFitWidth ? getBaseScale() : currentScale
+    let next = Math.round((base + 0.2) * 10) / 10
+    if (base <= 0.25) {
+      next = 0.4
+    }
+    currentScale = Math.min(3.0, Math.max(0.25, next))
+    isFitWidth = false
+    applyZoom()
+  }
+
+  function zoomOut() {
+    const base = isFitWidth ? getBaseScale() : currentScale
+    let next = Math.round((base - 0.2) * 10) / 10
+    if (next < 0.25) {
+      next = 0.25
+    }
+    currentScale = Math.max(0.25, Math.min(3.0, next))
+    isFitWidth = false
+    applyZoom()
+  }
+
+  function setFitWidth() {
+    isFitWidth = true
+    applyZoom()
+  }
+
+  function setActualSize() {
+    isFitWidth = false
+    currentScale = 1.0
+    applyZoom()
+  }
+
+  btnZoomOut.addEventListener('click', zoomOut)
+  btnZoomIn.addEventListener('click', zoomIn)
+  btnFit.addEventListener('click', setFitWidth)
+  btn100.addEventListener('click', setActualSize)
 
   btnOpenOs.addEventListener('click', async () => {
     const ok = await captureEngine.openArtifact(item.absolutePath)
@@ -152,6 +247,29 @@ export async function initViewerApp() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       window.close()
+      return
+    }
+
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return
+    }
+
+    if (e.ctrlKey || e.metaKey || e.altKey) {
+      return
+    }
+
+    if (e.key === '+' || e.key === '=' || e.key === 'Add') {
+      e.preventDefault()
+      zoomIn()
+    } else if (e.key === '-' || e.key === '_' || e.key === 'Subtract') {
+      e.preventDefault()
+      zoomOut()
+    } else if (e.key === '0') {
+      e.preventDefault()
+      setActualSize()
+    } else if (e.key === 'w' || e.key === 'W') {
+      e.preventDefault()
+      setFitWidth()
     }
   })
 
@@ -181,6 +299,7 @@ export async function initViewerApp() {
   imgEl.onload = () => {
     loadingEl.style.display = 'none'
     imgWrap.style.display = 'block'
+    applyZoom()
   }
 
   imgEl.onerror = () => {

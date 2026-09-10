@@ -85,20 +85,20 @@ let lastCaptureTime = 0
 
 async function safeCaptureVisibleTab(windowId?: number, retries = 5, signal?: AbortSignal): Promise<string> {
   if (signal?.aborted) {
-    throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+    throw new DOMException('Capture stopped by user', 'AbortError')
   }
   const minInterval = 550 // Minimum 550ms interval between calls to safely conform to MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND (2/sec)
   const elapsed = Date.now() - lastCaptureTime
   if (elapsed < minInterval) {
     await new Promise((r) => setTimeout(r, minInterval - elapsed))
     if (signal?.aborted) {
-      throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+      throw new DOMException('Capture stopped by user', 'AbortError')
     }
   }
 
   for (let attempt = 0; attempt < retries; attempt++) {
     if (signal?.aborted) {
-      throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+      throw new DOMException('Capture stopped by user', 'AbortError')
     }
     try {
       lastCaptureTime = Date.now()
@@ -106,7 +106,7 @@ async function safeCaptureVisibleTab(windowId?: number, retries = 5, signal?: Ab
       return await chrome.tabs.captureVisibleTab(targetWindowId, { format: 'png' })
     } catch (err: any) {
       if (signal?.aborted) {
-        throw new DOMException('Quá trình chụp đã bị dừng', 'AbortError')
+        throw new DOMException('Capture stopped by user', 'AbortError')
       }
       const msg = String(err?.message || '')
       if ((msg.includes('MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND') || msg.includes('quota')) && attempt < retries - 1) {
@@ -117,7 +117,7 @@ async function safeCaptureVisibleTab(windowId?: number, retries = 5, signal?: Ab
       throw err
     }
   }
-  throw new Error('Đã vượt quá giới hạn chụp của trình duyệt (quota exceeded), vui lòng thử lại sau giây lát')
+  throw new Error('Browser capture quota exceeded, please retry shortly')
 }
 
 export interface CaptureTabOptions {
@@ -135,7 +135,7 @@ export interface CaptureTabOptions {
  */
 export class CaptureEngine {
   constructor(
-    private sink: ArtifactSink = new AutoSink(),
+    public sink: ArtifactSink = new AutoSink(),
     private history: HistoryStore = historyStore
   ) {}
 
@@ -154,18 +154,24 @@ export class CaptureEngine {
       currentSlice: 0,
       totalSlices: 1,
       status: 'preparing',
-      message: 'Đang chuẩn bị trang...'
+      message: 'Preparing page...'
     })
 
     let dims: PageDimensions | null = null
     if (hasScript) {
+      options?.onProgress?.({
+        currentSlice: 0,
+        totalSlices: 1,
+        status: 'preparing',
+        message: 'Measuring viewport...'
+      })
       try {
         dims = await chrome.tabs.sendMessage(tab.id, { type: 'PREPARE_CAPTURE' })
       } catch {}
     }
 
     if (options?.signal?.aborted) {
-      throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
+      throw new DOMException('Capture stopped by user', 'AbortError')
     }
 
     if (!dims) {
@@ -272,14 +278,14 @@ export class CaptureEngine {
     try {
       for (let i = 0; i < totalSlices; i++) {
         if (options?.signal?.aborted) {
-          throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
+          throw new DOMException('Capture stopped by user', 'AbortError')
         }
         const slice = slices[i]
         options?.onProgress?.({
           currentSlice: i + 1,
           totalSlices,
           status: 'scrolling',
-          message: `Đang cuộn và chụp khung ${i + 1}/${totalSlices}...`
+          message: `Scrolling and stitching slice ${i + 1} of ${totalSlices}...`
         })
 
         await chrome.tabs.sendMessage(tab.id, {
@@ -293,14 +299,14 @@ export class CaptureEngine {
         const img = await loadImage(dataUrl)
 
         if (options?.signal?.aborted) {
-          throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
+          throw new DOMException('Capture stopped by user', 'AbortError')
         }
 
         options?.onProgress?.({
           currentSlice: i + 1,
           totalSlices,
           status: 'stitching',
-          message: `Đang ghép mảnh ${i + 1}/${totalSlices}...`
+          message: `Scrolling and stitching slice ${i + 1} of ${totalSlices}...`
         })
 
         if (!slice.isLast) {
@@ -328,14 +334,14 @@ export class CaptureEngine {
     }
 
     if (options?.signal?.aborted) {
-      throw new DOMException('Quá trình chụp đã bị dừng bởi người dùng', 'AbortError')
+      throw new DOMException('Capture stopped by user', 'AbortError')
     }
 
     options?.onProgress?.({
       currentSlice: totalSlices,
       totalSlices,
       status: 'saving',
-      message: 'Đang lưu ảnh và copy đường dẫn...'
+      message: 'Stitching complete, finalizing artifact...'
     })
 
     // 6. Generate thumbnail for history UI
@@ -379,7 +385,7 @@ export class CaptureEngine {
         try {
           await chrome.tabs.sendMessage(tab.id, {
             type: 'SHOW_TOAST',
-            message: 'Đã chụp & copy path vào clipboard!',
+            message: 'Screenshot captured & path copied to clipboard!',
             filePath: absolutePath
           })
         } catch {}
@@ -409,7 +415,7 @@ export class CaptureEngine {
       currentSlice: totalSlices,
       totalSlices,
       status: 'done',
-      message: 'Hoàn tất!'
+      message: 'Capture complete!'
     })
 
     return captureItem
@@ -425,7 +431,7 @@ export class CaptureEngine {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     const activeTab = tabs[0]
     if (!activeTab || !activeTab.id) {
-      throw new Error('Không tìm thấy tab đang kích hoạt')
+      throw new Error('No active tab found')
     }
     return this.captureTab(activeTab, { onProgress, signal })
   }
@@ -449,21 +455,21 @@ export class CaptureEngine {
     )
 
     if (validTabs.length === 0) {
-      throw new Error('Không có tab web hợp lệ nào để chụp')
+      throw new Error('No valid web tabs found to capture')
     }
 
     const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true })
     const initialActiveTabId = activeTabs[0]?.id
     const pendingItems: { item: CaptureItem; dataUrl: string }[] = []
 
-    // Giai đoạn 1: Quét và stitch ảnh của tất cả các tab (KHÔNG gọi lưu để tránh popup)
+    // Phase 1: Scan and stitch images for all tabs (do NOT save to avoid popups)
     for (let i = 0; i < validTabs.length; i++) {
       if (signal?.aborted) break
       const targetTab = validTabs[i]
       if (!targetTab.id) continue
 
       onProgress?.(
-        `Đang chụp tab ${i + 1}/${validTabs.length}: ${targetTab.title || 'Tab'}`,
+        `Capturing tab ${i + 1} of ${validTabs.length}: ${targetTab.title || 'Tab'}`,
         i + 1,
         validTabs.length
       )
@@ -479,7 +485,7 @@ export class CaptureEngine {
         const item = await this.captureTab(readyTab || targetTab, {
           skipClipboard: true,
           skipToast: true,
-          skipSave: true, // Hoãn lưu file cho đến khi scan xong toàn bộ!
+          skipSave: true, // Defer saving until all tabs have been scanned!
           signal
         })
         if (item.dataUrl) {
@@ -489,11 +495,11 @@ export class CaptureEngine {
         if (err?.name === 'AbortError' || signal?.aborted) {
           break
         }
-        console.error(`Lỗi khi chụp tab ${targetTab.id}:`, err)
+        console.error(`Error capturing tab ${targetTab.id}:`, err)
       }
     }
 
-    // Trở về tab ban đầu ngay khi quét xong
+    // Return to initial tab immediately after scanning
     if (initialActiveTabId) {
       try {
         await chrome.tabs.update(initialActiveTabId, { active: true })
@@ -502,17 +508,17 @@ export class CaptureEngine {
     }
 
     if (signal?.aborted && pendingItems.length === 0) {
-      throw new DOMException('Quá trình chụp batch đã bị dừng bởi người dùng', 'AbortError')
+      throw new DOMException('Capture stopped by user', 'AbortError')
     }
 
-    // Giai đoạn 2: Lưu toàn bộ ảnh đã quét và thu thập đường dẫn tuyệt đối
+    // Phase 2: Save all scanned images and collect absolute paths
     const capturedItems: CaptureItem[] = []
     for (let i = 0; i < pendingItems.length; i++) {
       if (signal?.aborted) break
       const { item, dataUrl } = pendingItems[i]
 
       onProgress?.(
-        `Đang lưu file ${i + 1}/${pendingItems.length}: ${item.filename}`,
+        `Saving file ${i + 1} of ${pendingItems.length}: ${item.filename}`,
         i + 1,
         pendingItems.length
       )
@@ -524,13 +530,13 @@ export class CaptureEngine {
         await this.history.add(item)
         capturedItems.push(item)
       } catch (err: any) {
-        console.error(`Lỗi khi lưu ảnh ${item.filename}:`, err)
+        console.error(`Error saving image ${item.filename}:`, err)
       }
     }
 
     const combinedPaths = capturedItems.map((i) => i.absolutePath).filter(Boolean).join('\n')
 
-    // Copy danh sách đường dẫn vào Clipboard
+    // Copy list of paths to clipboard
     if (this.sink.copyClipboard) {
       await this.sink.copyClipboard(combinedPaths)
     }
@@ -540,8 +546,8 @@ export class CaptureEngine {
       try {
         await chrome.tabs.sendMessage(initialActiveTabId, {
           type: 'SHOW_TOAST',
-          message: `Đã chụp & lưu ${capturedItems.length} tabs!`,
-          filePath: `${capturedItems.length} đường dẫn đã nạp vào clipboard`
+          message: `Captured & saved ${capturedItems.length} tabs!`,
+          filePath: `${capturedItems.length} paths copied to clipboard`
         })
       } catch {}
     }

@@ -12,7 +12,7 @@ const ICONS = {
   copy: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
   image: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
   trash: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-  check: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   close: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
   sidebar: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg>`,
   emptyFrame: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`
@@ -27,16 +27,27 @@ function formatTimestamp(timestamp: number): string {
 function notify(text: string) {
   const toast = document.getElementById('qs-toast')
   if (!toast) return
-  toast.innerHTML = `${ICONS.check} <span>${text}</span>`
+  toast.innerHTML = `<span style="display:inline-flex;color:var(--accent-emerald)">${ICONS.check}</span> <span>${text}</span>`
   toast.classList.add('active')
   setTimeout(() => {
     toast.classList.remove('active')
   }, 2200)
 }
 
+function triggerButtonCopied(btn: HTMLButtonElement, originalHtml: string) {
+  btn.classList.add('is-copied')
+  btn.innerHTML = `${ICONS.check} <span>Copied!</span>`
+  setTimeout(() => {
+    btn.classList.remove('is-copied')
+    btn.innerHTML = originalHtml
+  }, 1500)
+}
+
 export default async function initSidebarApp() {
   const root = document.getElementById('root')
   if (!root) return
+
+  const isSidebar = window.location.pathname.includes('sidebar')
 
   root.innerHTML = `
     <div class="qs-shell">
@@ -50,15 +61,32 @@ export default async function initSidebarApp() {
           </div>
         </div>
         <div class="qs-header-controls">
-          <button id="btn-dock-sidebar" class="qs-btn-icon" title="Dock to Side Panel" type="button">
-            ${ICONS.sidebar}
-          </button>
-          <div class="qs-status-pill">
+          ${
+            !isSidebar
+              ? `<button id="btn-dock-sidebar" class="qs-btn-icon" title="Dock to Side Panel" type="button">
+                   ${ICONS.sidebar}
+                 </button>`
+              : ''
+          }
+          <div id="sink-status-pill" class="qs-status-pill" title="Checking host status...">
             <span class="qs-status-dot"></span>
-            <span>READY</span>
+            <span id="sink-status-text">READY</span>
           </div>
         </div>
       </header>
+
+      <!-- Sink Transparency Dropdown Popover -->
+      <div id="sink-popover" class="qs-popover" style="display: none;">
+        <p class="qs-popover-text">Native host is not active. Captures are saved to <code>~/Downloads/quick-screen/</code>.</p>
+        <p class="qs-popover-hint">To enable fast direct /tmp saving and OS clipboard, run in your terminal:</p>
+        <div class="qs-code-snippet">
+          <code id="cmd-install-host">./install-native-host.sh</code>
+          <button id="btn-copy-install-cmd" class="qs-btn-copy-cmd" type="button">
+            ${ICONS.copy}
+            <span>Copy Command</span>
+          </button>
+        </div>
+      </div>
 
       <!-- Action Trigger Deck -->
       <section class="qs-trigger-deck">
@@ -81,7 +109,7 @@ export default async function initSidebarApp() {
               <div id="telemetry-bar-fill" class="qs-progress-fill" style="width: 0%;"></div>
             </div>
           </div>
-          <button id="btn-cancel-capture" class="qs-btn-cancel" type="button" title="Dừng chụp">
+          <button id="btn-cancel-capture" class="qs-btn-cancel" type="button" title="Stop capture">
             ${ICONS.close}
             <span>Stop</span>
           </button>
@@ -99,17 +127,31 @@ export default async function initSidebarApp() {
         </button>
       </div>
 
+      <!-- Safe Clear Confirmation Bar -->
+      <div id="qs-confirm-purge" class="qs-confirm-bar" style="display: none;">
+        <span id="qs-confirm-msg" class="qs-confirm-msg">Clear all captures?</span>
+        <div class="qs-confirm-actions">
+          <button id="btn-confirm-cancel" class="qs-btn-subtle" type="button">Cancel</button>
+          <button id="btn-confirm-clear" class="qs-btn-danger-sm" type="button">Clear All</button>
+        </div>
+      </div>
+
       <!-- Feed List -->
       <div id="capture-feed" class="qs-feed">
         <div class="qs-empty-feed">
           <div class="qs-empty-icon">${ICONS.emptyFrame}</div>
           <span class="qs-empty-label">No captures recorded</span>
           <span class="qs-empty-hint">Trigger capture above to auto-save and copy path for AI</span>
+          <button id="btn-empty-capture" class="qs-btn qs-btn-primary qs-empty-cta" type="button">
+            ${ICONS.camera}
+            <span>Capture Current Page</span>
+          </button>
         </div>
       </div>
 
-    <!-- Toast Notification -->
-    <div id="qs-toast" class="qs-toast"></div>
+      <!-- Toast Notification -->
+      <div id="qs-toast" class="qs-toast"></div>
+    </div>
   `
 
   const btnCaptureActive = document.getElementById('btn-capture-active') as HTMLButtonElement
@@ -122,6 +164,61 @@ export default async function initSidebarApp() {
   const feedContainer = document.getElementById('capture-feed') as HTMLDivElement
   const feedCount = document.getElementById('feed-count') as HTMLSpanElement
   const btnDockSidebar = document.getElementById('btn-dock-sidebar') as HTMLButtonElement | null
+  const sinkPill = document.getElementById('sink-status-pill') as HTMLDivElement | null
+  const sinkStatusText = document.getElementById('sink-status-text') as HTMLSpanElement | null
+  const sinkPopover = document.getElementById('sink-popover') as HTMLDivElement | null
+  const btnCopyInstallCmd = document.getElementById('btn-copy-install-cmd') as HTMLButtonElement | null
+  const confirmBar = document.getElementById('qs-confirm-purge') as HTMLDivElement
+  const confirmMsg = document.getElementById('qs-confirm-msg') as HTMLSpanElement
+  const btnConfirmCancel = document.getElementById('btn-confirm-cancel') as HTMLButtonElement
+  const btnConfirmClear = document.getElementById('btn-confirm-clear') as HTMLButtonElement
+
+  // Sink Health & Transparency
+  async function updateSinkStatus() {
+    if (!sinkPill || !sinkStatusText) return
+
+    let healthy = false
+    let mode: 'native' | 'download' = 'download'
+
+    try {
+      if (captureEngine.sink.checkHealth) {
+        const health = await captureEngine.sink.checkHealth()
+        healthy = health.healthy === true
+        mode = health.mode
+      }
+    } catch {
+      healthy = false
+      mode = 'download'
+    }
+
+    if (mode === 'native' && healthy) {
+      sinkPill.classList.remove('is-fallback')
+      sinkPill.classList.add('is-active')
+      sinkPill.title = 'Native host active (/tmp)'
+      sinkStatusText.textContent = 'HOST ACTIVE (/tmp)'
+      if (sinkPopover) sinkPopover.style.display = 'none'
+    } else {
+      sinkPill.classList.remove('is-active')
+      sinkPill.classList.add('is-fallback')
+      sinkPill.title = 'Native host not active - click for setup instructions'
+      sinkStatusText.textContent = 'FALLBACK (Downloads)'
+    }
+  }
+
+  sinkPill?.addEventListener('click', () => {
+    if (sinkPill.classList.contains('is-fallback') && sinkPopover) {
+      const isVisible = sinkPopover.style.display === 'flex'
+      sinkPopover.style.display = isVisible ? 'none' : 'flex'
+    }
+  })
+
+  btnCopyInstallCmd?.addEventListener('click', async () => {
+    const cmd = './install-native-host.sh'
+    await captureEngine.copyTextArtifact(cmd)
+    notify('Command copied to clipboard')
+    const origHtml = btnCopyInstallCmd.innerHTML
+    triggerButtonCopied(btnCopyInstallCmd, origHtml)
+  })
 
   if (btnDockSidebar) {
     btnDockSidebar.addEventListener('click', async () => {
@@ -147,8 +244,16 @@ export default async function initSidebarApp() {
           <div class="qs-empty-icon">${ICONS.emptyFrame}</div>
           <span class="qs-empty-label">No captures recorded</span>
           <span class="qs-empty-hint">Trigger capture above to auto-save and copy path for AI</span>
+          <button id="btn-empty-capture" class="qs-btn qs-btn-primary qs-empty-cta" type="button">
+            ${ICONS.camera}
+            <span>Capture Current Page</span>
+          </button>
         </div>
       `
+      const btnEmptyCapture = document.getElementById('btn-empty-capture') as HTMLButtonElement | null
+      btnEmptyCapture?.addEventListener('click', () => {
+        btnCaptureActive.click()
+      })
       return
     }
 
@@ -183,12 +288,14 @@ export default async function initSidebarApp() {
       )
       .join('')
 
-    // Bind card action buttons
+    // Bind card action buttons with micro-interaction feedback
     feedContainer.querySelectorAll<HTMLButtonElement>('.qs-action-copy-path').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const path = btn.getAttribute('data-path')
         if (path) {
+          const origHtml = btn.innerHTML
           await captureEngine.copyTextArtifact(path)
+          triggerButtonCopied(btn, origHtml)
           notify('Path copied to clipboard')
         }
       })
@@ -199,8 +306,10 @@ export default async function initSidebarApp() {
         const id = btn.getAttribute('data-id')
         const item = items.find((i) => i.id === id)
         if (item) {
+          const origHtml = btn.innerHTML
           const ok = await captureEngine.copyImageArtifact(item.absolutePath, item.thumbnailDataUrl)
           if (ok) {
+            triggerButtonCopied(btn, origHtml)
             notify('Raw image copied to clipboard')
           } else {
             notify('Failed to copy image')
@@ -264,6 +373,7 @@ export default async function initSidebarApp() {
 
       notify('Capture complete & path copied')
       await renderFeed()
+      await updateSinkStatus()
     } catch (err: any) {
       if (err?.name === 'AbortError' || activeAbortController?.signal.aborted) {
         notify('Capture stopped by user')
@@ -323,6 +433,7 @@ export default async function initSidebarApp() {
       if (result.items.length > 0) {
         notify(`Captured ${result.items.length} tabs & paths copied`)
         await renderFeed()
+        await updateSinkStatus()
       } else {
         notify('Batch capture stopped')
       }
@@ -345,20 +456,33 @@ export default async function initSidebarApp() {
     }
   })
 
-  // Purge History
+  // Safe Clear History (Inline confirmation bar, no native alert/confirm)
   btnPurge.addEventListener('click', async () => {
-    if (confirm('Clear all recorded captures from history?')) {
-      await historyStore.clear()
-      await renderFeed()
-      notify('History cleared')
+    const items = await historyStore.list()
+    if (items.length === 0) {
+      notify('History is already empty')
+      return
     }
+    confirmMsg.textContent = `Clear all ${items.length} captures?`
+    confirmBar.style.display = 'flex'
   })
 
-  // Initial render
+  btnConfirmCancel.addEventListener('click', () => {
+    confirmBar.style.display = 'none'
+  })
+
+  btnConfirmClear.addEventListener('click', async () => {
+    confirmBar.style.display = 'none'
+    await historyStore.clear()
+    await renderFeed()
+    notify('History cleared')
+  })
+
+  // Initial render & health check
   await renderFeed()
+  await updateSinkStatus()
 
   // Auto-trigger batch capture if handed off from popup
-  const isSidebar = window.location.pathname.includes('sidebar')
   if (isSidebar) {
     const triggerData = await chrome.storage.local.get('qs_trigger_batch')
     if (triggerData.qs_trigger_batch) {

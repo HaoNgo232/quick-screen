@@ -1,3 +1,5 @@
+import type { SinkHealth } from '../types/capture'
+
 /**
  * Seam: ArtifactSink
  * Two real adapters exist: NativeHostSink (/tmp via stdio) and DownloadApiSink (Downloads API).
@@ -10,6 +12,7 @@ export interface ArtifactSink {
   readFile?(filepath: string): Promise<string | null>
   readFileChunk?(filepath: string, offset: number, chunkSize?: number): Promise<{ data: string; eof: boolean; totalSize: number } | null>
   openFile?(filepath: string): Promise<boolean>
+  checkHealth?(): Promise<SinkHealth>
 }
 
 /**
@@ -147,6 +150,41 @@ export class NativeHostSink implements ArtifactSink {
       }
     })
   }
+
+  async checkHealth(): Promise<SinkHealth> {
+    return new Promise((resolve) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: false })
+        }
+      }, 2000)
+
+      try {
+        chrome.runtime.sendNativeMessage(
+          'com.quickscreen.host',
+          { action: 'ping' },
+          (response) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            if (chrome.runtime.lastError || !response || response.status !== 'ok' || !response.pong) {
+              resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: false })
+            } else {
+              resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: true })
+            }
+          }
+        )
+      } catch {
+        if (!settled) {
+          settled = true
+          clearTimeout(timer)
+          resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: false })
+        }
+      }
+    })
+  }
 }
 
 /**
@@ -189,6 +227,10 @@ export class DownloadApiSink implements ArtifactSink {
         }
       )
     })
+  }
+
+  async checkHealth(): Promise<SinkHealth> {
+    return { mode: 'download', directory: 'Downloads/quick-screen', healthy: true }
   }
 }
 
@@ -259,5 +301,22 @@ export class AutoSink implements ArtifactSink {
       results.push(await this.downloadSink.save(item.filename, item.dataUrl))
     }
     return results
+  }
+
+  async checkHealth(): Promise<SinkHealth> {
+    if (this.nativeSink.checkHealth) {
+      try {
+        const health = await this.nativeSink.checkHealth()
+        if (health && health.healthy) {
+          return health
+        }
+      } catch {
+        // Native sink threw or failed, fall back
+      }
+    }
+    if (this.downloadSink.checkHealth) {
+      return await this.downloadSink.checkHealth()
+    }
+    return { mode: 'download', directory: 'Downloads/quick-screen', healthy: true }
   }
 }

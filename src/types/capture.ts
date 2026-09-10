@@ -27,3 +27,9 @@ export interface CaptureProgress {
   status: 'preparing' | 'scrolling' | 'stitching' | 'saving' | 'done' | 'error'
   message?: string
 }
+
+export interface SinkHealth {
+  mode: 'native' | 'download'
+  directory: string
+  healthy: boolean
+}
