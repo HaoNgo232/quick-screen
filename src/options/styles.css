@@ -4,11 +4,23 @@
   padding: 0;
 }
 
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: #090d16;
   color: #e2e8f0;
+}
+
+#viewer-root {
   height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -231,15 +243,20 @@ body {
 /* Main View Area */
 .qs-viewer-canvas {
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 24px 16px;
+  align-items: center;
+  padding: 24px 16px 64px;
   width: 100%;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .qs-viewer-img-wrap {
   display: block;
+  flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px #1e293b;
