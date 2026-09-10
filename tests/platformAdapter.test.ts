@@ -5,7 +5,7 @@ import * as path from 'path'
 const HOST_SCRIPT = path.resolve(__dirname, '../native-host/quick_screen_host.py')
 
 describe('PlatformAdapter Unit & Seam Verification', () => {
-  it('LinuxAdapter resolves storage dir to /tmp/quick-screen', () => {
+  it('LinuxAdapter resolves storage dir to /tmp/quick-shot', () => {
     const pyCode = `
 import sys
 sys.path.insert(0, '${path.dirname(HOST_SCRIPT)}')
@@ -15,7 +15,7 @@ print(adapter.get_storage_dir())
 `
     const res = spawnSync('python3', ['-c', pyCode], { encoding: 'utf-8' })
     expect(res.status).toBe(0)
-    expect(res.stdout.trim()).toBe('/tmp/quick-screen')
+    expect(res.stdout.trim()).toBe('/tmp/quick-shot')
   })
 
   it('WindowsAdapter resolves storage dir based on TEMP environment variable', () => {
@@ -29,7 +29,7 @@ print(adapter.get_storage_dir())
 `
     const res = spawnSync('python3', ['-c', pyCode], { encoding: 'utf-8' })
     expect(res.status).toBe(0)
-    expect(res.stdout.trim()).toBe('C:\\Users\\Test\\AppData\\Local\\Temp/quick-screen'.replace('/', path.sep))
+    expect(res.stdout.trim()).toBe('C:\\Users\\Test\\AppData\\Local\\Temp/quick-shot'.replace('/', path.sep))
   })
 
   it('get_platform_adapter selects WindowsAdapter on win32 and LinuxAdapter on linux', () => {

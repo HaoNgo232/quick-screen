@@ -1,4 +1,4 @@
-# quick-screen
+# quick-shot
 
 A browser extension that captures web page screenshots, saves them locally to the Downloads directory, and copies both the absolute file path and image data to the clipboard for instant AI ingestion.
 
@@ -17,7 +17,7 @@ Writing both `text/plain` (absolute filesystem path) and `image/png` (binary blo
 _Avoid_: Plain text copy, image-only paste
 
 **Artifact Path**:
-The absolute local filesystem path (`/home/user/Downloads/quick-screen/YYYY-MM-DD_HH-mm-ss_slug.png`) resolved from `chrome.downloads.DownloadItem.filename`.
+The absolute local filesystem path (`/home/user/Downloads/quick-shot/YYYY-MM-DD_HH-mm-ss_slug.png`) resolved from `chrome.downloads.DownloadItem.filename`.
 _Avoid_: Download URL, relative path, web link
 
 **History Panel**:

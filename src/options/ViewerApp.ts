@@ -64,7 +64,7 @@ export async function initViewerApp() {
 
   const item: CaptureItem = foundItem
 
-  document.title = `${item.pageTitle} - quick-screen Viewer`
+  document.title = `${item.pageTitle} - quick-shot Viewer`
 
   root.innerHTML = `
     <header class="qs-viewer-header">

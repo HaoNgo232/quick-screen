@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "quick-screen",
+      "name": "quick-shot",
       "devDependencies": {
         "@types/chrome": "^0.2.9",
         "extension": "^4.1.14",

@@ -3,7 +3,7 @@
   "chromium:manifest_version": 3,
   "firefox:manifest_version": 2,
   "version": "1.0.0",
-  "name": "quick-screen",
+  "name": "quick-shot",
   "description": "Capture full page screenshots, auto-save, and copy path for AI ingestion.",
   "icons": {
     "16": "images/icon-16.png",
@@ -20,7 +20,7 @@
       "64": "images/icon-64.png",
       "128": "images/icon-128.png"
     },
-    "default_title": "quick-screen",
+    "default_title": "quick-shot",
     "default_popup": "sidebar/index.html"
   },
   "firefox:browser_action": {
@@ -31,15 +31,15 @@
       "64": "images/icon-64.png",
       "128": "images/icon-128.png"
     },
-    "default_title": "quick-screen Side Panel"
+    "default_title": "quick-shot Side Panel"
   },
   "chromium:side_panel": {
     "default_path": "sidebar/index.html",
-    "default_title": "quick-screen History & Capture"
+    "default_title": "quick-shot History & Capture"
   },
   "firefox:sidebar_action": {
     "default_panel": "sidebar/index.html",
-    "default_title": "quick-screen History & Capture"
+    "default_title": "quick-shot History & Capture"
   },
   "options_ui": {
     "page": "options/index.html",

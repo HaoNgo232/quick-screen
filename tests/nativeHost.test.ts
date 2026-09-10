@@ -5,7 +5,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 
-const DEFAULT_BIN = path.join(os.homedir(), '.local/bin/quick-screen-host')
+const DEFAULT_BIN = path.join(os.homedir(), '.local/bin/quick-shot-host')
 const HOST_PATH = fs.existsSync(DEFAULT_BIN)
   ? DEFAULT_BIN
   : path.resolve(__dirname, '../native-host/quick_screen_host.py')
@@ -36,7 +36,7 @@ describe('Native Messaging Host Bridge', () => {
     expect(response.pong).toBe(true)
   })
 
-  it('saves base64 png directly to /tmp/quick-screen', async () => {
+  it('saves base64 png directly to /tmp/quick-shot', async () => {
     const proc = spawn(HOST_PATH, [], {
       stdio: ['pipe', 'pipe', 'inherit']
     })
@@ -67,16 +67,16 @@ describe('Native Messaging Host Bridge', () => {
     proc.kill()
 
     expect(response.status).toBe('ok')
-    expect(response.absolutePath).toBe(`/tmp/quick-screen/${testFilename}`)
-    expect(fs.existsSync(`/tmp/quick-screen/${testFilename}`)).toBe(true)
+    expect(response.absolutePath).toBe(`/tmp/quick-shot/${testFilename}`)
+    expect(fs.existsSync(`/tmp/quick-shot/${testFilename}`)).toBe(true)
 
     // Cleanup test artifact
-    fs.unlinkSync(`/tmp/quick-screen/${testFilename}`)
+    fs.unlinkSync(`/tmp/quick-shot/${testFilename}`)
   })
 
   it('handles copy_image action successfully', async () => {
-    const testFile = '/tmp/quick-screen/test-copy-img.png'
-    fs.mkdirSync('/tmp/quick-screen', { recursive: true })
+    const testFile = '/tmp/quick-shot/test-copy-img.png'
+    fs.mkdirSync('/tmp/quick-shot', { recursive: true })
     fs.writeFileSync(testFile, Buffer.from('fake-png'))
 
     const proc = spawn(HOST_PATH, [], {
@@ -106,9 +106,9 @@ describe('Native Messaging Host Bridge', () => {
   })
 
   it('handles read_file action returning base64 dataUrl', async () => {
-    const testFile = '/tmp/quick-screen/test-read-file.png'
-    fs.mkdirSync('/tmp/quick-screen', { recursive: true })
-    fs.writeFileSync(testFile, Buffer.from('quick-screen-test-data'))
+    const testFile = '/tmp/quick-shot/test-read-file.png'
+    fs.mkdirSync('/tmp/quick-shot', { recursive: true })
+    fs.writeFileSync(testFile, Buffer.from('quick-shot-test-data'))
 
     const proc = spawn(HOST_PATH, [], {
       stdio: ['pipe', 'pipe', 'inherit']
@@ -137,9 +137,9 @@ describe('Native Messaging Host Bridge', () => {
   })
 
   it('handles read_file_chunk action returning chunked data', async () => {
-    const testFile = '/tmp/quick-screen/test-chunk-file.png'
-    fs.mkdirSync('/tmp/quick-screen', { recursive: true })
-    const content = Buffer.from('hello-world-quick-screen-chunked-data')
+    const testFile = '/tmp/quick-shot/test-chunk-file.png'
+    fs.mkdirSync('/tmp/quick-shot', { recursive: true })
+    const content = Buffer.from('hello-world-quick-shot-chunked-data')
     fs.writeFileSync(testFile, content)
 
     const proc = spawn(HOST_PATH, [], {

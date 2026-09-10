@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [x] Create `quick-screen-host.bat` wrapper to invoke Python without console popups.
+- [x] Create `quick-shot-host.bat` wrapper to invoke Python without console popups.
 - [x] Create `install-native-host.bat` to configure the host JSON manifest with Windows backslashes and add the Registry key.
 - [x] Support both Chrome (`Google\Chrome`) and Edge / Chromium registry paths.
 - [x] Include clear uninstall instructions / commands.

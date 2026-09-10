@@ -17,7 +17,7 @@ export interface ArtifactSink {
 
 /**
  * Adapter 1: NativeHostSink
- * Saves directly to /tmp/quick-screen/ with zero prompts via native messaging host.
+ * Saves directly to /tmp/quick-shot/ with zero prompts via native messaging host.
  */
 export class NativeHostSink implements ArtifactSink {
   async save(filename: string, dataUrl: string, copyClipboard = true): Promise<string> {
@@ -157,7 +157,7 @@ export class NativeHostSink implements ArtifactSink {
       const timer = setTimeout(() => {
         if (!settled) {
           settled = true
-          resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: false })
+          resolve({ mode: 'native', directory: '/tmp/quick-shot', healthy: false })
         }
       }, 2000)
 
@@ -170,9 +170,9 @@ export class NativeHostSink implements ArtifactSink {
             settled = true
             clearTimeout(timer)
             if (chrome.runtime.lastError || !response || response.status !== 'ok' || !response.pong) {
-              resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: false })
+              resolve({ mode: 'native', directory: '/tmp/quick-shot', healthy: false })
             } else {
-              resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: true })
+              resolve({ mode: 'native', directory: '/tmp/quick-shot', healthy: true })
             }
           }
         )
@@ -180,7 +180,7 @@ export class NativeHostSink implements ArtifactSink {
         if (!settled) {
           settled = true
           clearTimeout(timer)
-          resolve({ mode: 'native', directory: '/tmp/quick-screen', healthy: false })
+          resolve({ mode: 'native', directory: '/tmp/quick-shot', healthy: false })
         }
       }
     })
@@ -189,7 +189,7 @@ export class NativeHostSink implements ArtifactSink {
 
 /**
  * Adapter 2: DownloadApiSink
- * Universal fallback writing into ~/Downloads/quick-screen/ via chrome.downloads.
+ * Universal fallback writing into ~/Downloads/quick-shot/ via chrome.downloads.
  */
 export class DownloadApiSink implements ArtifactSink {
   async save(filename: string, dataUrl: string): Promise<string> {
@@ -197,7 +197,7 @@ export class DownloadApiSink implements ArtifactSink {
       chrome.downloads.download(
         {
           url: dataUrl,
-          filename: `quick-screen/${filename}`,
+          filename: `quick-shot/${filename}`,
           saveAs: false,
           conflictAction: 'uniquify'
         },
@@ -230,7 +230,7 @@ export class DownloadApiSink implements ArtifactSink {
   }
 
   async checkHealth(): Promise<SinkHealth> {
-    return { mode: 'download', directory: 'Downloads/quick-screen', healthy: true }
+    return { mode: 'download', directory: 'Downloads/quick-shot', healthy: true }
   }
 }
 
@@ -317,6 +317,6 @@ export class AutoSink implements ArtifactSink {
     if (this.downloadSink.checkHealth) {
       return await this.downloadSink.checkHealth()
     }
-    return { mode: 'download', directory: 'Downloads/quick-screen', healthy: true }
+    return { mode: 'download', directory: 'Downloads/quick-shot', healthy: true }
   }
 }

@@ -56,7 +56,7 @@ export default async function initSidebarApp() {
         <div class="qs-brand">
           <div class="qs-brand-icon">${ICONS.viewfinder}</div>
           <div class="qs-brand-info">
-            <h1 class="qs-brand-title">quick-screen</h1>
+            <h1 class="qs-brand-title">quick-shot</h1>
             <span class="qs-brand-tagline">AI Screen Capture Bridge</span>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default async function initSidebarApp() {
 
       <!-- Sink Transparency Dropdown Popover -->
       <div id="sink-popover" class="qs-popover" style="display: none;">
-        <p class="qs-popover-text">Native host is not active. Captures are saved to <code>~/Downloads/quick-screen/</code>.</p>
+        <p class="qs-popover-text">Native host is not active. Captures are saved to <code>~/Downloads/quick-shot/</code>.</p>
         <p class="qs-popover-hint">To enable fast direct /tmp saving and OS clipboard, run in your terminal:</p>
         <div class="qs-code-snippet">
           <code id="cmd-install-host">./install-native-host.sh</code>

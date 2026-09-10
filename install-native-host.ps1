@@ -1,12 +1,12 @@
-# PowerShell installer for quick-screen Native Messaging Host on Windows
+# PowerShell installer for quick-shot Native Messaging Host on Windows
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "Installing quick-screen Native Messaging Host (Windows)" -ForegroundColor Cyan
+Write-Host "Installing quick-shot Native Messaging Host (Windows)" -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$installDir = Join-Path $env:USERPROFILE ".quick-screen"
+$installDir = Join-Path $env:USERPROFILE ".quick-shot"
 
 if (!(Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
@@ -14,14 +14,14 @@ if (!(Test-Path $installDir)) {
 
 Write-Host "[*] Copying host files to $installDir..."
 Copy-Item (Join-Path $scriptDir "native-host\quick_screen_host.py") -Destination $installDir -Force
-Copy-Item (Join-Path $scriptDir "native-host\quick-screen-host.bat") -Destination $installDir -Force
+Copy-Item (Join-Path $scriptDir "native-host\quick-shot-host.bat") -Destination $installDir -Force
 
-$batPath = Join-Path $installDir "quick-screen-host.bat"
+$batPath = Join-Path $installDir "quick-shot-host.bat"
 $manifestPath = Join-Path $installDir "com.quickscreen.host.json"
 
 $manifest = @{
     name = "com.quickscreen.host"
-    description = "quick-screen Native Messaging Host for automatic saving to temp"
+    description = "quick-shot Native Messaging Host for automatic saving to temp"
     path = $batPath
     type = "stdio"
     allowed_origins = @(

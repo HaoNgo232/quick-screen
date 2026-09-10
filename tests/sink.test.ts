@@ -16,19 +16,19 @@ class FailingSink implements ArtifactSink {
 
 class HealthyNativeSink implements ArtifactSink {
   async save(filename: string): Promise<string> {
-    return `/tmp/quick-screen/${filename}`
+    return `/tmp/quick-shot/${filename}`
   }
   async checkHealth(): Promise<SinkHealth> {
-    return { mode: 'native', directory: '/tmp/quick-screen', healthy: true }
+    return { mode: 'native', directory: '/tmp/quick-shot', healthy: true }
   }
 }
 
 class UnhealthyNativeSink implements ArtifactSink {
   async save(filename: string): Promise<string> {
-    return `/tmp/quick-screen/${filename}`
+    return `/tmp/quick-shot/${filename}`
   }
   async checkHealth(): Promise<SinkHealth> {
-    return { mode: 'native', directory: '/tmp/quick-screen', healthy: false }
+    return { mode: 'native', directory: '/tmp/quick-shot', healthy: false }
   }
 }
 
@@ -43,10 +43,10 @@ class RejectingNativeSink implements ArtifactSink {
 
 class HealthyDownloadSink implements ArtifactSink {
   async save(filename: string): Promise<string> {
-    return `Downloads/quick-screen/${filename}`
+    return `Downloads/quick-shot/${filename}`
   }
   async checkHealth(): Promise<SinkHealth> {
-    return { mode: 'download', directory: 'Downloads/quick-screen', healthy: true }
+    return { mode: 'download', directory: 'Downloads/quick-shot', healthy: true }
   }
 }
 
@@ -86,7 +86,7 @@ describe('ArtifactSink Health Checking', () => {
     const health = await downloadSink.checkHealth()
     expect(health).toEqual({
       mode: 'download',
-      directory: 'Downloads/quick-screen',
+      directory: 'Downloads/quick-shot',
       healthy: true
     })
   })
@@ -99,7 +99,7 @@ describe('ArtifactSink Health Checking', () => {
     const health = await autoSink.checkHealth()
     expect(health).toEqual({
       mode: 'native',
-      directory: '/tmp/quick-screen',
+      directory: '/tmp/quick-shot',
       healthy: true
     })
   })
@@ -112,7 +112,7 @@ describe('ArtifactSink Health Checking', () => {
     const health = await autoSink.checkHealth()
     expect(health).toEqual({
       mode: 'download',
-      directory: 'Downloads/quick-screen',
+      directory: 'Downloads/quick-shot',
       healthy: true
     })
   })
@@ -125,7 +125,7 @@ describe('ArtifactSink Health Checking', () => {
     const health = await autoSink.checkHealth()
     expect(health).toEqual({
       mode: 'download',
-      directory: 'Downloads/quick-screen',
+      directory: 'Downloads/quick-shot',
       healthy: true
     })
   })
@@ -146,7 +146,7 @@ describe('ArtifactSink Health Checking', () => {
     const health = await nativeSink.checkHealth()
     expect(health).toEqual({
       mode: 'native',
-      directory: '/tmp/quick-screen',
+      directory: '/tmp/quick-shot',
       healthy: true
     })
   })
@@ -165,7 +165,7 @@ describe('ArtifactSink Health Checking', () => {
     const health = await nativeSink.checkHealth()
     expect(health).toEqual({
       mode: 'native',
-      directory: '/tmp/quick-screen',
+      directory: '/tmp/quick-shot',
       healthy: false
     })
   })
@@ -183,7 +183,7 @@ describe('ArtifactSink Health Checking', () => {
     const health = await nativeSink.checkHealth()
     expect(health).toEqual({
       mode: 'native',
-      directory: '/tmp/quick-screen',
+      directory: '/tmp/quick-shot',
       healthy: false
     })
   })

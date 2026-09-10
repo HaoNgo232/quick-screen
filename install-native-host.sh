@@ -2,9 +2,9 @@
 set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_PATH="$HOME/.local/bin/quick-screen-host"
+BIN_PATH="$HOME/.local/bin/quick-shot-host"
 
-echo "==> Cài đặt script quick-screen-host vào $BIN_PATH"
+echo "==> Cài đặt script quick-shot-host vào $BIN_PATH"
 mkdir -p "$HOME/.local/bin"
 
 cp "$DIR/native-host/quick_screen_host.py" "$BIN_PATH"
@@ -18,7 +18,7 @@ for config_dir in "$HOME/.config/google-chrome" "$HOME/.config/chromium" "$HOME/
     cat << JSON_EOF > "$config_dir/NativeMessagingHosts/com.quickscreen.host.json"
 {
   "name": "com.quickscreen.host",
-  "description": "quick-screen Native Messaging Host for automatic saving to /tmp",
+  "description": "quick-shot Native Messaging Host for automatic saving to /tmp",
   "path": "$BIN_PATH",
   "type": "stdio",
   "allowed_origins": [

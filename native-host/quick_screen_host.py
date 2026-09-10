@@ -25,7 +25,7 @@ class PlatformAdapter:
 class LinuxAdapter(PlatformAdapter):
     """Adapter for Linux (X11 & Wayland)."""
     def get_storage_dir(self) -> str:
-        return "/tmp/quick-screen"
+        return "/tmp/quick-shot"
 
     def copy_text(self, text: str) -> bool:
         try:
@@ -62,7 +62,7 @@ class WindowsAdapter(PlatformAdapter):
     """Adapter for Windows (NTFS, clip.exe, Win32 / PowerShell clipboard, os.startfile)."""
     def get_storage_dir(self) -> str:
         temp_base = os.environ.get('TEMP') or os.environ.get('TMP') or tempfile.gettempdir()
-        return os.path.join(temp_base, "quick-screen")
+        return os.path.join(temp_base, "quick-shot")
 
     def copy_text(self, text: str) -> bool:
         # 1. Try ctypes Win32 clipboard

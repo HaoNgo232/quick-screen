@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
-echo "==> Gỡ cài đặt quick-screen Native Messaging Host trên Linux..."
+echo "==> Gỡ cài đặt quick-shot Native Messaging Host trên Linux..."
 
-rm -f "$HOME/.local/bin/quick-screen-host"
-echo "    ✓ Đã xóa $HOME/.local/bin/quick-screen-host"
+rm -f "$HOME/.local/bin/quick-shot-host"
+echo "    ✓ Đã xóa $HOME/.local/bin/quick-shot-host"
 
 for config_dir in "$HOME/.config/google-chrome" "$HOME/.config/chromium" "$HOME/.config/BraveSoftware/Brave-Browser"; do
   manifest="$config_dir/NativeMessagingHosts/com.quickscreen.host.json"

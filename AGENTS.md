@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for autonomous coding agents developing `quick-screen`.
+Guidance for autonomous coding agents developing `quick-shot`.
 
 ## Verification Loop
 
@@ -13,10 +13,10 @@ Target output: `dist/chromium/` (manifest v3, extension.js engine).
 
 ## Architecture & Seams
 
-`quick-screen` captures browser pages, persists images to disk, and places local file paths into the clipboard for instant AI inspection (`view_file`).
+`quick-shot` captures browser pages, persists images to disk, and places local file paths into the clipboard for instant AI inspection (`view_file`).
 
 ### 1. Artifact Sink Seam (`src/core/artifactSink.ts`)
-- `NativeHostSink` (primary): Dispatches base64 images via native messaging to `com.quickscreen.host` (Python script configured by `install-native-host.sh`), writing directly to `/tmp/quick-screen/` and handling OS clipboard (X11/Wayland).
+- `NativeHostSink` (primary): Dispatches base64 images via native messaging to `com.quickscreen.host` (Python script configured by `install-native-host.sh`), writing directly to `/tmp/quick-shot/` and handling OS clipboard (X11/Wayland).
 - `DownloadSink` (fallback): Uses `chrome.downloads.download` with `saveAs: false`.
 - `AutoSink`: Tries `NativeHostSink` first; transparently falls back to `DownloadSink`.
 

@@ -1,6 +1,6 @@
 # 02: Windows Host Adapter: Storage Dir, Launching & Text Clipboard
 
-**What to build:** Implement `WindowsAdapter` in `native-host/quick_screen_host.py` that handles Windows temp storage resolution (`%TEMP%\quick-screen`), opening files (`os.startfile`), and text clipboard copying (`clip.exe` / win32 ctypes fallback).
+**What to build:** Implement `WindowsAdapter` in `native-host/quick_screen_host.py` that handles Windows temp storage resolution (`%TEMP%\quick-shot`), opening files (`os.startfile`), and text clipboard copying (`clip.exe` / win32 ctypes fallback).
 
 **Blocked by:** 01: Platform Adapter Seam in Python Native Host
 

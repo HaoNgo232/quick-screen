@@ -1,6 +1,6 @@
 # Hướng dẫn Cài đặt & Vận hành Native Host trên Windows
 
-Tài liệu này hướng dẫn chi tiết cách cài đặt, vận hành và khắc phục sự cố cho thành phần **Native Messaging Host** của `quick-screen` trên hệ điều hành **Windows**.
+Tài liệu này hướng dẫn chi tiết cách cài đặt, vận hành và khắc phục sự cố cho thành phần **Native Messaging Host** của `quick-shot` trên hệ điều hành **Windows**.
 
 ---
 
@@ -11,8 +11,8 @@ Mặc định, tiện ích mở rộng Chrome chạy trong môi trường bảo 
 - Trình duyệt chỉ cho phép lưu vào thư mục `Downloads`.
 
 **Native Messaging Host** giải quyết triệt để các hạn chế này:
-- **Zero-Prompt Auto Save**: Ảnh chụp được lưu ngầm 100% thẳng vào thư mục tạm của Windows (`%TEMP%\quick-screen`), không bao giờ mở hộp thoại hỏi vị trí.
-- **Dual Clipboard**: Tự động nạp cả đường dẫn tuyệt đối (`C:\Users\...\AppData\Local\Temp\quick-screen\...png`) và dữ liệu nhị phân ảnh trực tiếp vào Clipboard Windows qua Win32 API / PowerShell, giúp dán ngay vào các công cụ AI (Antigravity, Cursor, ChatGPT, Claude) hoặc Discord, Slack, Figma.
+- **Zero-Prompt Auto Save**: Ảnh chụp được lưu ngầm 100% thẳng vào thư mục tạm của Windows (`%TEMP%\quick-shot`), không bao giờ mở hộp thoại hỏi vị trí.
+- **Dual Clipboard**: Tự động nạp cả đường dẫn tuyệt đối (`C:\Users\...\AppData\Local\Temp\quick-shot\...png`) và dữ liệu nhị phân ảnh trực tiếp vào Clipboard Windows qua Win32 API / PowerShell, giúp dán ngay vào các công cụ AI (Antigravity, Cursor, ChatGPT, Claude) hoặc Discord, Slack, Figma.
 
 ---
 
@@ -30,7 +30,7 @@ Mặc định, tiện ích mở rộng Chrome chạy trong môi trường bảo 
 Bạn có thể chọn một trong hai cách cài đặt:
 
 ### Cách 1: Dùng Command Prompt / File Batch (Khuyên dùng)
-1. Mở thư mục dự án `quick-screen`.
+1. Mở thư mục dự án `quick-shot`.
 2. Click đúp vào file:
    ```cmd
    install-native-host.bat
@@ -57,17 +57,17 @@ Khi bạn chạy script cài đặt, hệ thống sẽ tự động cấu hình 
 ### A. Thư mục cài đặt Host
 Script sẽ copy các file cần thiết vào thư mục người dùng:
 ```text
-%USERPROFILE%\.quick-screen\
+%USERPROFILE%\.quick-shot\
   ├── quick_screen_host.py     (Code Python xử lý IPC stdio & OS adapter)
-  ├── quick-screen-host.bat    (Wrapper thực thi Python không hiển thị console)
+  ├── quick-shot-host.bat    (Wrapper thực thi Python không hiển thị console)
   └── com.quickscreen.host.json (Manifest khai báo với Chrome)
 ```
 
 ### B. Vị trí lưu ảnh chụp
 Toàn bộ ảnh chụp được lưu tự động tại:
 ```text
-%TEMP%\quick-screen\
-(Ví dụ: C:\Users\<Username>\AppData\Local\Temp\quick-screen\<filename>.png)
+%TEMP%\quick-shot\
+(Ví dụ: C:\Users\<Username>\AppData\Local\Temp\quick-shot\<filename>.png)
 ```
 
 ### C. Đăng ký Windows Registry
@@ -106,7 +106,7 @@ File `native-host/quick_screen_host.py` sử dụng `WindowsAdapter` đáp ứng
 
 ### Lỗi 2: Extension ID không khớp
 - File manifest `com.quickscreen.host.json` cấu hình danh sách extension ID được phép truy cập (`allowed_origins`).
-- Nếu bạn đóng gói extension với ID khác, hãy cập nhật thêm ID đó vào mảng `allowed_origins` trong file `%USERPROFILE%\.quick-screen\com.quickscreen.host.json`.
+- Nếu bạn đóng gói extension với ID khác, hãy cập nhật thêm ID đó vào mảng `allowed_origins` trong file `%USERPROFILE%\.quick-shot\com.quickscreen.host.json`.
 
 ---
 
@@ -118,4 +118,4 @@ uninstall-native-host.bat
 ```
 Script sẽ tự động:
 1. Xóa các key đã đăng ký trong Windows Registry của tất cả các trình duyệt.
-2. Xóa sạch thư mục `%USERPROFILE%\.quick-screen\`.
+2. Xóa sạch thư mục `%USERPROFILE%\.quick-shot\`.

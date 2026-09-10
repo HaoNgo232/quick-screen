@@ -2,17 +2,17 @@
 setlocal enabledelayedexpansion
 
 echo ========================================================
-echo Installing quick-screen Native Messaging Host (Windows)
+echo Installing quick-shot Native Messaging Host (Windows)
 echo ========================================================
 
-set "INSTALL_DIR=%USERPROFILE%\.quick-screen"
+set "INSTALL_DIR=%USERPROFILE%\.quick-shot"
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
 echo [*] Copying host files to %INSTALL_DIR%...
 copy /Y "%~dp0native-host\quick_screen_host.py" "%INSTALL_DIR%\" >nul
-copy /Y "%~dp0native-host\quick-screen-host.bat" "%INSTALL_DIR%\" >nul
+copy /Y "%~dp0native-host\quick-shot-host.bat" "%INSTALL_DIR%\" >nul
 
-set "BAT_PATH=%INSTALL_DIR%\quick-screen-host.bat"
+set "BAT_PATH=%INSTALL_DIR%\quick-shot-host.bat"
 set "ESCAPED_BAT_PATH=%BAT_PATH:\=\\%"
 set "MANIFEST_PATH=%INSTALL_DIR%\com.quickscreen.host.json"
 
@@ -20,7 +20,7 @@ echo [*] Generating manifest %MANIFEST_PATH%...
 (
     echo {
     echo   "name": "com.quickscreen.host",
-    echo   "description": "quick-screen Native Messaging Host for automatic saving to temp",
+    echo   "description": "quick-shot Native Messaging Host for automatic saving to temp",
     echo   "path": "%ESCAPED_BAT_PATH%",
     echo   "type": "stdio",
     echo   "allowed_origins": [
